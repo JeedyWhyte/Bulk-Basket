@@ -1,0 +1,32 @@
+name: Backend CI
+
+on:
+  pull_request:
+    paths: ['backend/**']
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: test_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r backend/requirements-dev.txt
+      - run: |
+          cd backend
+          python manage.py test
+        env:
+          DB_NAME: test_db
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          DB_HOST: localhost
