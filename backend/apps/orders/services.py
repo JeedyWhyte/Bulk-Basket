@@ -1,7 +1,11 @@
 from decimal import Decimal
+from django.db import models
 from apps.common.exceptions import BusinessLogicError
 from apps.products.models import Product
 from .models import Order, OrderItem
+
+
+DELIVERY_FEE = Decimal('500.00')
 
 
 def create_order(buyer, seller_id, items_data, address):
@@ -13,15 +17,25 @@ def create_order(buyer, seller_id, items_data, address):
     order_items = []
 
     for item in items_data:
-        product = Product.objects.get(id=item['product_id'])
+        try:
+            product = Product.objects.get(id=item['product_id'])
+        except Product.DoesNotExist:
+            raise BusinessLogicError(
+                f"Product with id '{item['product_id']}' does not exist."
+            )
 
-        if product.seller_id != seller_id:
+        if str(product.seller_id) != str(seller_id):
             raise BusinessLogicError(
                 f"Product '{product.name}' does not belong to this seller."
             )
+        if not product.is_available:
+            raise BusinessLogicError(
+                f"Product '{product.name}' is not available."
+            )
         if product.stock_quantity < item['quantity']:
             raise BusinessLogicError(
-                f"Insufficient stock for '{product.name}'."
+                f"Insufficient stock for '{product.name}'. "
+                f"Available: {product.stock_quantity}."
             )
         if item['quantity'] < product.min_order_qty:
             raise BusinessLogicError(
@@ -31,35 +45,39 @@ def create_order(buyer, seller_id, items_data, address):
 
         line_total = product.price * item['quantity']
         subtotal += line_total
-        order_items.append(
-            OrderItem(
-                product=product,
-                quantity=item['quantity'],
-                unit_price=product.price,
-                total_price=line_total,
-            )
-        )
+        order_items.append({
+            'product': product,
+            'quantity': item['quantity'],
+            'unit_price': product.price,
+            'total_price': line_total,
+        })
 
-    delivery_fee = Decimal('500.00')  # Flat fee — refine later
-    total = subtotal + delivery_fee
+    total = subtotal + DELIVERY_FEE
 
     order = Order.objects.create(
         buyer=buyer,
         seller_id=seller_id,
         delivery_address=address,
         subtotal=subtotal,
-        delivery_fee=delivery_fee,
+        delivery_fee=DELIVERY_FEE,
         total=total,
     )
 
-    for item in order_items:
-        item.order = order
-    OrderItem.objects.bulk_create(order_items)
+    OrderItem.objects.bulk_create([
+        OrderItem(
+            order=order,
+            product=item['product'],
+            quantity=item['quantity'],
+            unit_price=item['unit_price'],
+            total_price=item['total_price'],
+        )
+        for item in order_items
+    ])
 
     # Deduct stock
-    for item_data, item_obj in zip(items_data, order_items):
-        Product.objects.filter(id=item_data['product_id']).update(
-            stock_quantity=models.F('stock_quantity') - item_data['quantity']
+    for item in order_items:
+        Product.objects.filter(id=item['product'].id).update(
+            stock_quantity=models.F('stock_quantity') - item['quantity']
         )
 
     return order
