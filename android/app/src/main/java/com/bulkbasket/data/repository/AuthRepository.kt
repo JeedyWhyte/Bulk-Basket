@@ -17,7 +17,7 @@ class AuthRepository @Inject constructor(
 
     override suspend fun login(
         username: String,
-        password: String
+        password: String,
     ): NetworkResult<User> {
         return try {
             val response = api.login(LoginRequest(username, password))
@@ -25,11 +25,14 @@ class AuthRepository @Inject constructor(
                 val body = response.body()!!
                 prefs.saveTokens(body.access, body.refresh)
 
-                // Fetch full profile after login
                 val profileResponse = api.getProfile()
                 if (profileResponse.isSuccessful) {
                     val user = profileResponse.body()!!.toUser()
-                    prefs.saveRole(user.role)
+                    prefs.saveUserInfo(
+                        role = user.role,
+                        username = user.username,
+                        userId = user.id.toString(),
+                    )
                     NetworkResult.Success(user)
                 } else {
                     NetworkResult.Error("Failed to load profile")
