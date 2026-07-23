@@ -1,5 +1,7 @@
 package com.bulkbasket.data.remote.api
 
+import com.bulkbasket.data.remote.dto.AddressDto
+import com.bulkbasket.data.remote.dto.AddressRequest
 import com.bulkbasket.data.remote.dto.LoginRequest
 import com.bulkbasket.data.remote.dto.LoginResponse
 import com.bulkbasket.data.remote.dto.RegisterRequest
@@ -22,4 +24,10 @@ interface AuthApi {
 
     @PUT("users/profile/")
     suspend fun updateProfile(@Body data: Map<String, String>): Response<UserDto>
+
+    @GET("users/addresses/")
+    suspend fun getAddresses(): Response<List<AddressDto>>
+
+    @POST("users/addresses/")
+    suspend fun createAddress(@Body request: AddressRequest): Response<AddressDto>
 }
