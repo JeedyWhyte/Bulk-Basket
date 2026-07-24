@@ -3,6 +3,7 @@ package com.bulkbasket.di
 import com.bulkbasket.data.remote.interceptors.AuthInterceptor
 import com.bulkbasket.utils.Constants
 import com.bulkbasket.data.remote.api.AuthApi
+import com.bulkbasket.data.remote.api.DeliveryApi
 import com.bulkbasket.data.remote.api.NotificationsApi
 import com.bulkbasket.data.remote.api.OrdersApi
 import com.bulkbasket.data.remote.api.ProductsApi
@@ -79,5 +80,11 @@ object NetworkModule {
     @Singleton
     fun provideNotificationsApi(retrofit: Retrofit): NotificationsApi {
         return retrofit.create(NotificationsApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideDeliveryApi(retrofit: Retrofit): DeliveryApi {
+        return retrofit.create(DeliveryApi::class.java)
     }
 }
