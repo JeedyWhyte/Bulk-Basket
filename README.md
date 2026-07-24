@@ -139,11 +139,11 @@ BulkBasket follows a **layered client-server architecture** with a real-time eve
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                      CLIENT LAYER (Android)                      │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐      │
-│  │  Buyer App   │    │  Seller App  │    │  Rider App   │      │
-│  │   (Kotlin)   │    │   (Kotlin)   │    │   (Kotlin)   │      │
-│  └──────┬───────┘    └──────┬───────┘    └──────┬───────┘      │
+│                      CLIENT LAYER (Android)                     │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐       │
+│  │  Buyer App   │    │  Seller App  │    │  Rider App   │       │
+│  │   (Kotlin)   │    │   (Kotlin)   │    │   (Kotlin)   │       │
+│  └──────┬───────┘    └──────┬───────┘    └──────┬───────┘       │
 │         │                   │                    │              │
 │         └───────────────────┴────────────────────┘              │
 │                             │                                   │
@@ -152,36 +152,36 @@ BulkBasket follows a **layered client-server architecture** with a real-time eve
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    APPLICATION LAYER (Backend)                   │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │              Django REST Framework API                   │   │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────┐  │   │
-│  │  │ Products │  │  Orders  │  │  Users   │  │Delivery│  │   │
-│  │  └──────────┘  └──────────┘  └──────────┘  └────────┘  │   │
-│  └─────────────────────────────────────────────────────────┘   │
+│                    APPLICATION LAYER (Backend)                  │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │              Django REST Framework API                  │    │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────┐   │    │
+│  │  │ Products │  │  Orders  │  │  Users   │  │Delivery│   │    │
+│  │  └──────────┘  └──────────┘  └──────────┘  └────────┘   │    │
+│  └─────────────────────────────────────────────────────────┘    │
 │                             │                                   │
-│  ┌──────────────┐    ┌─────────────┐    ┌────────────────┐    │
-│  │ Celery Tasks │    │   Redis     │    │ Supabase Auth  │    │
-│  │ (Async Jobs) │◄──►│  (Cache &   │    │  (JWT Tokens)  │    │
-│  │              │    │   Broker)   │    │                │    │
-│  └──────────────┘    └─────────────┘    └────────────────┘    │
+│  ┌──────────────┐    ┌─────────────┐    ┌────────────────┐      │
+│  │ Celery Tasks │    │   Redis     │    │ Supabase Auth  │      │
+│  │ (Async Jobs) │◄──►│  (Cache &   │    │  (JWT Tokens)  │      │
+│  │              │    │   Broker)   │    │                │      │
+│  └──────────────┘    └─────────────┘    └────────────────┘      │
 └────────────────────────────┬────────────────────────────────────┘
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                       DATA LAYER (Supabase)                      │
-│  ┌──────────────┐  ┌──────────────┐  ┌─────────────────────┐   │
-│  │  PostgreSQL  │  │   Realtime   │  │   Object Storage    │   │
-│  │  (Database)  │  │ (WebSockets) │  │ (Images & Media)    │   │
-│  └──────────────┘  └──────────────┘  └─────────────────────┘   │
+│                       DATA LAYER (Supabase)                     │
+│  ┌──────────────┐  ┌──────────────┐  ┌─────────────────────┐    │
+│  │  PostgreSQL  │  │   Realtime   │  │   Object Storage    │    │
+│  │  (Database)  │  │ (WebSockets) │  │ (Images & Media)    │    │
+│  └──────────────┘  └──────────────┘  └─────────────────────┘    │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ### Android App Architecture (MVVM + Repository)
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│                     UI LAYER                             │
+┌─────────────────────────────────────────────────────────┐
+│                     UI LAYER                            │
 │  ┌────────────────┐         ┌────────────────────┐      │
 │  │   Activity /   │◄───────►│    ViewModel       │      │
 │  │   Fragment     │ observe │  (StateFlow /      │      │
@@ -189,10 +189,10 @@ BulkBasket follows a **layered client-server architecture** with a real-time eve
 │  └────────────────┘         └─────────┬──────────┘      │
 └──────────────────────────────────────┬─┴────────────────┘
                                        │
-┌──────────────────────────────────────▼──────────────────┐
-│                  REPOSITORY LAYER                       │
+┌──────────────────────────────────────▼─────────────────┐
+│                  REPOSITORY LAYER                      │
 │  ┌──────────────────────────────────────────────────┐  │
-│  │            Repository (Single Source)             │  │
+│  │            Repository (Single Source)            │  │
 │  │   Decides: Remote (API) or Local (Room) ?        │  │
 │  └─────┬───────────────────────────┬────────────────┘  │
 └────────┼───────────────────────────┼───────────────────┘
@@ -228,7 +228,7 @@ Buyer places order
          │                          │
          ▼                          ▼
    Celery Task              ┌──────────────────────┐
-   (FCM notify             │  WebSocket subscribers│
+   (FCM notify              │ WebSocket subscribers│
     seller)                 │  • Buyer (track)     │
                             │  • Seller (new order)│
                             │  • Rider (job alert) │
@@ -301,7 +301,7 @@ Before starting, ensure you have the following installed:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/<your-org>/bulkbasket.git
+git clone https://github.com/jeedywhyte/bulkbasket.git
 cd bulkbasket
 ```
 
@@ -606,16 +606,16 @@ All errors follow this schema:
 └──────┬───────┘         └──────────────┘         │ image_url    │
        │                                          └──────┬───────┘
        │                                                 │
-       │         ┌──────────────┐                       │
-       │         │   orders     │                       │
-       │         ├──────────────┤                       │
-       └────────►│ buyer_id (FK)│                       │
-                 │ seller_id    │                       │
-                 │ status       │      ┌──────────────┐│
-                 │ total_amount │      │ order_items  ││
-                 │ delivery_addr├─────►├──────────────┤│
-                 │ created_at   │      │ order_id (FK)││
-                 └──────┬───────┘      │ product_id   │┘
+       │         ┌──────────────┐                        │
+       │         │   orders     │                        │
+       │         ├──────────────┤                        │
+       └────────►│ buyer_id (FK)│                        │
+                 │ seller_id    │                        │
+                 │ status       │      ┌──────────────┐  │
+                 │ total_amount │      │ order_items  │  │
+                 │ delivery_addr├─────►├──────────────┤  │
+                 │ created_at   │      │ order_id (FK)│  │
+                 └──────┬───────┘      │ product_id   │──┘
                         │              │ quantity     │
                         │              │ price_at_buy │
                         ▼              └──────────────┘
