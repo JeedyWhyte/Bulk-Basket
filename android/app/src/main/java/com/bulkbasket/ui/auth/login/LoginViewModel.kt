@@ -19,16 +19,27 @@ data class LoginState(
 
 @HiltViewModel
 class LoginViewModel @Inject constructor(
-    private val authRepository: IAuthRepository
+    private val authRepository: IAuthRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(LoginState())
     val state: StateFlow<LoginState> = _state
 
     fun login(username: String, password: String) {
-        viewModelScope.launch {
-            _state.value = _state.value.copy(isLoading = true, error = null)
+        if (username.isBlank()) {
+            _state.value = _state.value.copy(error = "Username cannot be empty.")
+            return
+        }
+        if (password.isBlank()) {
+            _state.value = _state.value.copy(error = "Password cannot be empty.")
+            return
+        }
 
+        viewModelScope.launch {
+            _state.value = _state.value.copy(
+                isLoading = true,
+                error = null,
+            )
             when (val result = authRepository.login(username, password)) {
                 is NetworkResult.Success -> {
                     _state.value = _state.value.copy(
@@ -46,5 +57,9 @@ class LoginViewModel @Inject constructor(
                 is NetworkResult.Loading -> {}
             }
         }
+    }
+
+    fun clearError() {
+        _state.value = _state.value.copy(error = null)
     }
 }

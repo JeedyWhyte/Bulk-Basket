@@ -1,4 +1,4 @@
-package com.bulkbasket.ui.auth.login
+package com.bulkbasket.ui.auth.signup
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -22,6 +22,10 @@ import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -46,27 +50,36 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lint.kotlin.metadata.Visibility
 import com.bulkbasket.ui.theme.Dimensions
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LoginScreen(
-    onLoginSuccess: (role: String) -> Unit,
-    onNavigateToSignup: () -> Unit,
-    viewModel: LoginViewModel = hiltViewModel(),
+fun SignupScreen(
+    onSignupSuccess: () -> Unit,
+    onNavigateToLogin: () -> Unit,
+    viewModel: SignupViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
     val focusManager = LocalFocusManager.current
 
     var username by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var confirmPasswordVisible by remember { mutableStateOf(false) }
+    var selectedRole by remember { mutableStateOf("buyer") }
+    var roleDropdownExpanded by remember { mutableStateOf(false) }
 
-    // Navigate on successful login
-    LaunchedEffect(state.isLoggedIn) {
-        if (state.isLoggedIn && state.userRole != null) {
-            onLoginSuccess(state.userRole!!)
-        }
+    val roles = listOf(
+        "buyer" to "Buyer - I want to purchase goods",
+        "seller" to "Seller - I sell goods at the market",
+        "rider" to "Rider - I deliver orders",
+    )
+
+    LaunchedEffect(state.isSuccess) {
+        if (state.isSuccess) onSignupSuccess()
     }
 
     Box(
@@ -78,29 +91,29 @@ fun LoginScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = Dimensions.paddingLarge),
+                .padding(horizontal = Dimensions.paddingLarge)
+                .padding(vertical = Dimensions.paddingXLarge),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
         ) {
 
             // Header
             Text(
-                text = "BulkBasket",
-                style = MaterialTheme.typography.displayMedium.copy(
+                text = "Create Account",
+                style = MaterialTheme.typography.headlineLarge.copy(
                     fontWeight = FontWeight.Bold,
                 ),
                 color = MaterialTheme.colorScheme.primary,
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Fresh from the market",
+                text = "Join BulkBasket today",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
-            // Username field
+            // Username
             OutlinedTextField(
                 value = username,
                 onValueChange = {
@@ -122,7 +135,92 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(Dimensions.paddingMedium))
 
-            // Password field
+            // Email
+            OutlinedTextField(
+                value = email,
+                onValueChange = {
+                    email = it
+                    viewModel.clearError()
+                },
+                label = { Text("Email") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(Dimensions.radiusMedium),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Email,
+                    imeAction = ImeAction.Next,
+                ),
+                keyboardActions = KeyboardActions(
+                    onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                ),
+                isError = state.error != null,
+            )
+
+            Spacer(modifier = Modifier.height(Dimensions.paddingMedium))
+
+            // Phone
+            OutlinedTextField(
+                value = phone,
+                onValueChange = {
+                    phone = it
+                    viewModel.clearError()
+                },
+                label = { Text("Phone Number") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(Dimensions.radiusMedium),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Phone,
+                    imeAction = ImeAction.Next,
+                ),
+                keyboardActions = KeyboardActions(
+                    onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                ),
+                isError = state.error != null,
+            )
+
+            Spacer(modifier = Modifier.height(Dimensions.paddingMedium))
+
+            // Role dropdown
+            ExposedDropdownMenuBox(
+                expanded = roleDropdownExpanded,
+                onExpandedChange = { roleDropdownExpanded = it },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                OutlinedTextField(
+                    value = roles.first { it.first == selectedRole }.second,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("I am a...") },
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(
+                            expanded = roleDropdownExpanded
+                        )
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(),
+                    shape = RoundedCornerShape(Dimensions.radiusMedium),
+                )
+                ExposedDropdownMenu(
+                    expanded = roleDropdownExpanded,
+                    onDismissRequest = { roleDropdownExpanded = false },
+                ) {
+                    roles.forEach { (value, label) ->
+                        DropdownMenuItem(
+                            text = { Text(label) },
+                            onClick = {
+                                selectedRole = value
+                                roleDropdownExpanded = false
+                            },
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(Dimensions.paddingMedium))
+
+            // Password
             OutlinedTextField(
                 value = password,
                 onValueChange = {
@@ -139,13 +237,10 @@ fun LoginScreen(
                     PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Password,
-                    imeAction = ImeAction.Done,
+                    imeAction = ImeAction.Next,
                 ),
                 keyboardActions = KeyboardActions(
-                    onDone = {
-                        focusManager.clearFocus()
-                        viewModel.login(username, password)
-                    }
+                    onNext = { focusManager.moveFocus(FocusDirection.Down) }
                 ),
                 trailingIcon = {
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
@@ -154,10 +249,51 @@ fun LoginScreen(
                                 Icons.Filled.Visibility
                             else
                                 Icons.Filled.VisibilityOff,
-                            contentDescription = if (passwordVisible)
-                                "Hide password"
+                            contentDescription = null,
+                        )
+                    }
+                },
+                isError = state.error != null,
+            )
+
+            Spacer(modifier = Modifier.height(Dimensions.paddingMedium))
+
+            // Confirm Password
+            OutlinedTextField(
+                value = confirmPassword,
+                onValueChange = {
+                    confirmPassword = it
+                    viewModel.clearError()
+                },
+                label = { Text("Confirm Password") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(Dimensions.radiusMedium),
+                visualTransformation = if (confirmPasswordVisible)
+                    VisualTransformation.None
+                else
+                    PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Done,
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        focusManager.clearFocus()
+                        viewModel.register(
+                            username, email, password,
+                            confirmPassword, selectedRole, phone,
+                        )
+                    }
+                ),
+                trailingIcon = {
+                    IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
+                        Icon(
+                            imageVector = if (confirmPasswordVisible)
+                                Icons.Filled.Visibility
                             else
-                                "Show password",
+                                Icons.Filled.VisibilityOff,
+                            contentDescription = null,
                         )
                     }
                 },
@@ -177,11 +313,14 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(Dimensions.paddingLarge))
 
-            // Login button
+            // Sign up button
             Button(
                 onClick = {
                     focusManager.clearFocus()
-                    viewModel.login(username, password)
+                    viewModel.register(
+                        username, email, password,
+                        confirmPassword, selectedRole, phone,
+                    )
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -200,7 +339,7 @@ fun LoginScreen(
                     )
                 } else {
                     Text(
-                        text = "Log In",
+                        text = "Create Account",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -209,18 +348,18 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(Dimensions.paddingMedium))
 
-            // Sign up link
+            // Login link
             Row(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "Don't have an account?",
+                    text = "Already have an account?",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                TextButton(onClick = onNavigateToSignup) {
+                TextButton(onClick = onNavigateToLogin) {
                     Text(
-                        text = "Sign Up",
+                        text = "Log In",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.primary,
