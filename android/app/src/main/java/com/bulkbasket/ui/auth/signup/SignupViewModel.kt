@@ -72,7 +72,7 @@ class SignupViewModel @Inject constructor(
                 is NetworkResult.Error -> {
                     _state.value = _state.value.copy(
                         isLoading = false,
-                        error = result.message,
+                        error = "Code: ${result.code} — ${result.message}",
                     )
                 }
                 is NetworkResult.Loading -> {}

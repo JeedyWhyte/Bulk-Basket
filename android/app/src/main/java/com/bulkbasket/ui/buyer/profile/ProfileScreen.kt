@@ -188,10 +188,7 @@ fun ProfileScreen(
                                         contentAlignment = Alignment.Center,
                                     ) {
                                         Text(
-                                            text = user.username
-                                                .first()
-                                                .uppercaseChar()
-                                                .toString(),
+                                            text = user.username?.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
                                             style = MaterialTheme.typography.displayMedium,
                                             color = Green600,
                                             fontWeight = FontWeight.Bold,
@@ -201,14 +198,14 @@ fun ProfileScreen(
                                     Spacer(modifier = Modifier.height(Dimensions.paddingSmall))
 
                                     Text(
-                                        text = user.username,
+                                        text = user.username ?: "Unknown User",
                                         style = MaterialTheme.typography.headlineMedium,
                                         fontWeight = FontWeight.Bold,
                                     )
                                     Text(
-                                        text = user.role.replaceFirstChar {
+                                        text = user.role?.replaceFirstChar {
                                             it.uppercase()
-                                        },
+                                        } ?: "Unknown Role",
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.primary,
                                         fontWeight = FontWeight.Medium,
@@ -258,7 +255,7 @@ fun ProfileScreen(
                                             )
                                         },
                                         label = "Username",
-                                        value = user.username,
+                                        value = user.username ?: "N/A",
                                     )
                                     HorizontalDivider(
                                         modifier = Modifier.padding(
@@ -274,7 +271,7 @@ fun ProfileScreen(
                                             )
                                         },
                                         label = "Email",
-                                        value = user.email,
+                                        value = user.email ?: "N/A",
                                     )
                                     HorizontalDivider(
                                         modifier = Modifier.padding(
@@ -290,9 +287,9 @@ fun ProfileScreen(
                                             )
                                         },
                                         label = "Phone",
-                                        value = user.phoneNumber.ifBlank {
+                                        value = user.phoneNumber?.ifBlank {
                                             "Not provided"
-                                        },
+                                        } ?: "Not provided",
                                     )
                                     HorizontalDivider(
                                         modifier = Modifier.padding(
@@ -304,14 +301,14 @@ fun ProfileScreen(
                                             Icon(
                                                 imageVector = Icons.Filled.Star,
                                                 contentDescription = null,
-                                                tint = if (user.isVerified)
+                                                tint = if (user.isVerified == true)
                                                     MaterialTheme.colorScheme.primary
                                                 else
                                                     MaterialTheme.colorScheme.outline,
                                             )
                                         },
                                         label = "Verified",
-                                        value = if (user.isVerified) "Yes" else "No",
+                                        value = if (user.isVerified == true) "Yes" else "No",
                                     )
                                 }
                             }

@@ -2,11 +2,17 @@ package com.bulkbasket.data.remote.api
 
 import com.bulkbasket.data.remote.dto.CategoryDto
 import com.bulkbasket.data.remote.dto.PaginatedResponse
+import com.bulkbasket.data.remote.dto.ProductCreateRequest
 import com.bulkbasket.data.remote.dto.ProductDto
 import retrofit2.Response
 import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.Query
+import retrofit2.http.Body
+import retrofit2.http.DELETE
+import retrofit2.http.PATCH
+import retrofit2.http.POST
+import retrofit2.http.PUT
 
 interface ProductsApi {
     @GET("products/")
@@ -23,4 +29,21 @@ interface ProductsApi {
 
     @GET("products/categories/")
     suspend fun getCategories(): Response<List<CategoryDto>>
+
+    @POST("products/")
+    suspend fun createProduct(
+        @Body request: ProductCreateRequest
+    ): Response<ProductDto>
+
+    @PUT("products/{id}/")
+    suspend fun updateProduct(
+        @Path("id") id: Int,
+        @Body request: ProductCreateRequest,
+    ): Response<ProductDto>
+
+    @DELETE("products/{id}/")
+    suspend fun deleteProduct(@Path("id") id: Int): Response<Unit>
+
+    @GET("products/?seller=me")
+    suspend fun getMyProducts(): Response<PaginatedResponse<ProductDto>>
 }

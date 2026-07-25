@@ -31,8 +31,8 @@ class AuthRepository @Inject constructor(
                 if (profileResponse.isSuccessful) {
                     val user = profileResponse.body()!!.toUser()
                     prefs.saveUserInfo(
-                        role = user.role,
-                        username = user.username,
+                        role = user.role ?: "",
+                        username = user.username ?: "",
                         userId = user.id.toString(),
                     )
                     NetworkResult.Success(user)
@@ -59,9 +59,15 @@ class AuthRepository @Inject constructor(
                 RegisterRequest(username, email, password, role, phone)
             )
             if (response.isSuccessful) {
-                NetworkResult.Success(response.body()!!.toUser())
+                val user = response.body()?.data?.toUser()
+                if (user != null) {
+                    NetworkResult.Success(user)
+                } else {
+                    NetworkResult.Error("Registration failed — empty response")
+                }
             } else {
-                NetworkResult.Error("Registration failed", response.code())
+                val errorBody = response.errorBody()?.string()
+                NetworkResult.Error(errorBody ?: "Registration failed", response.code())
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")

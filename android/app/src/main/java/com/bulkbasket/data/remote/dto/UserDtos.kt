@@ -48,3 +48,9 @@ data class AddressRequest(
     val longitude: String?,
     val is_default: Boolean,
 )
+
+data class ApiResponse<T>(
+    val status: String,
+    val message: String,
+    val data: T?,
+)

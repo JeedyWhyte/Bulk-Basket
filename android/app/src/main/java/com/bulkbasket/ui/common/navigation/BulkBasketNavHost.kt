@@ -15,6 +15,8 @@ import com.bulkbasket.ui.buyer.checkout.CheckoutScreen
 import com.bulkbasket.ui.buyer.orders.BuyerOrdersScreen
 import com.bulkbasket.ui.buyer.profile.ProfileScreen
 import com.bulkbasket.ui.seller.dashboard.SellerDashboardScreen
+import com.bulkbasket.ui.seller.inventory.InventoryScreen
+import com.bulkbasket.ui.seller.profile.SellerProfileScreen
 import com.bulkbasket.ui.rider.jobs.RiderJobsScreen
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -117,7 +119,31 @@ fun BulkBasketNavHost(
 
         // Seller screens
         composable(Routes.SellerDashboard.route) {
-            SellerDashboardScreen()
+            SellerDashboardScreen(
+                onInventoryClick = {
+                    navController.navigate(Routes.Inventory.route)
+                },
+                onProfileClick = {
+                    navController.navigate(Routes.SellerProfile.route)
+                },
+            )
+        }
+
+        composable(Routes.Inventory.route) {
+            InventoryScreen(
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.SellerProfile.route) {
+            SellerProfileScreen(
+                onBack = { navController.popBackStack() },
+                onLogout = {
+                    navController.navigate(Routes.Login.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                },
+            )
         }
 
         // Rider screens
