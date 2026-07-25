@@ -26,6 +26,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material.icons.filled.Inventory
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
@@ -44,6 +45,7 @@ import com.bulkbasket.ui.theme.Dimensions
 fun SellerDashboardScreen(
     onInventoryClick: () -> Unit,
     onProfileClick: () -> Unit,
+    onNotificationsClick: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SellerDashboardViewModel = hiltViewModel(),
 ) {
@@ -73,6 +75,13 @@ fun SellerDashboardScreen(
                     titleContentColor = MaterialTheme.colorScheme.onPrimary,
                 ),
                 actions = {
+                    IconButton(onClick = onNotificationsClick) {
+                        Icon(
+                            imageVector = Icons.Filled.Notifications,
+                            contentDescription = "Notifications",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    }
                     IconButton(onClick = onProfileClick) {
                         Icon(
                             imageVector = Icons.Filled.Person,

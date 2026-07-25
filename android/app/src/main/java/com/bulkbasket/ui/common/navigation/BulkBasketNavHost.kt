@@ -8,6 +8,8 @@ import androidx.navigation.compose.composable
 import com.bulkbasket.ui.auth.login.LoginScreen
 import com.bulkbasket.ui.auth.signup.SignupScreen
 import com.bulkbasket.ui.splash.SplashScreen
+import com.bulkbasket.ui.shared.notifications.NotificationsScreen
+import com.bulkbasket.ui.buyer.productdetail.ProductDetailScreen
 import com.bulkbasket.ui.buyer.home.HomeScreen
 import com.bulkbasket.ui.buyer.sellerdetail.SellerDetailScreen
 import com.bulkbasket.ui.buyer.cart.CartScreen
@@ -18,10 +20,17 @@ import com.bulkbasket.ui.seller.dashboard.SellerDashboardScreen
 import com.bulkbasket.ui.seller.inventory.InventoryScreen
 import com.bulkbasket.ui.seller.profile.SellerProfileScreen
 import com.bulkbasket.ui.rider.jobs.RiderJobsScreen
+import com.bulkbasket.ui.rider.profile.RiderProfileScreen
+import com.bulkbasket.ui.rider.activedelivery.ActiveDeliveryScreen
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Alignment
 import androidx.compose.material3.Text
+import androidx.compose.runtime.remember
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
+import com.bulkbasket.ui.buyer.cart.CartViewModel
 
 @Composable
 fun BulkBasketNavHost(
@@ -94,26 +103,22 @@ fun BulkBasketNavHost(
 
         // Buyer screens
         composable(Routes.BuyerHome.route) {
+            val cartViewModel: CartViewModel = hiltViewModel(it)
+
             HomeScreen(
                 onSellerClick = { sellerId ->
-                    navController.navigate(
-                        Routes.SellerDetail.createRoute(sellerId)
-                    )
+                    navController.navigate(Routes.SellerDetail.createRoute(sellerId))
                 },
                 onProductClick = { productId ->
-                    navController.navigate(
-                        Routes.ProductDetail.createRoute(productId)
-                    )
+                    navController.navigate(Routes.ProductDetail.createRoute(productId))
                 },
-                onCartClick = {
-                    navController.navigate(Routes.Cart.route)
+                onCartClick = { navController.navigate(Routes.Cart.route) },
+                onOrdersClick = { navController.navigate(Routes.BuyerOrders.route) },
+                onProfileClick = { navController.navigate(Routes.Profile.route) },
+                onNotificationsClick = {
+                    navController.navigate(Routes.Notifications.route)
                 },
-                onOrdersClick = {
-                    navController.navigate(Routes.BuyerOrders.route)
-                },
-                onProfileClick = {
-                    navController.navigate(Routes.Profile.route)
-                },
+                cartViewModel = cartViewModel,
             )
         }
 
@@ -125,6 +130,9 @@ fun BulkBasketNavHost(
                 },
                 onProfileClick = {
                     navController.navigate(Routes.SellerProfile.route)
+                },
+                onNotificationsClick = {
+                    navController.navigate(Routes.Notifications.route)
                 },
             )
         }
@@ -148,34 +156,89 @@ fun BulkBasketNavHost(
 
         // Rider screens
         composable(Routes.Jobs.route) {
-            RiderJobsScreen()
+            RiderJobsScreen(
+                onProfileClick = {
+                    navController.navigate(Routes.RiderProfile.route)
+                },
+                onActiveDeliveryClick = { deliveryId ->
+                    navController.navigate(
+                        Routes.ActiveDelivery.createRoute(deliveryId)
+                    )
+                },
+                onNotificationsClick = {
+                    navController.navigate(Routes.Notifications.route)
+                                       },
+            )
+        }
+
+        composable(Routes.RiderProfile.route) {
+            RiderProfileScreen(
+                onBack = { navController.popBackStack() },
+                onLogout = {
+                    navController.navigate(Routes.Login.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                },
+            )
+        }
+
+        composable(
+            route = Routes.ActiveDelivery.route,
+            arguments = listOf(
+                navArgument("deliveryId") { type = NavType.IntType }
+            ),
+        ) {
+            ActiveDeliveryScreen(
+                onBack = { navController.popBackStack() },
+                onDeliveryComplete = {
+                    navController.navigate(Routes.Jobs.route) {
+                        popUpTo(Routes.Jobs.route) { inclusive = true }
+                    }
+                },
+            )
         }
 
         // Seller Details
-        composable(Routes.SellerDetail.route) {
+        composable(
+            route = Routes.SellerDetail.route,
+            arguments = listOf(
+                navArgument("sellerId") { type = NavType.IntType }
+            ),
+        ) {
+            val buyerHomeEntry = remember(it) {
+                navController.getBackStackEntry(Routes.BuyerHome.route)
+            }
+            val cartViewModel: CartViewModel = hiltViewModel(buyerHomeEntry)
+
             SellerDetailScreen(
                 onBack = { navController.popBackStack() },
                 onProductClick = { productId ->
-                    navController.navigate(
-                        Routes.ProductDetail.createRoute(productId)
-                    )
+                    navController.navigate(Routes.ProductDetail.createRoute(productId))
                 },
-                onViewCart = {
-                    navController.navigate(Routes.Cart.route)
-                },
+                onViewCart = { navController.navigate(Routes.Cart.route) },
+                cartViewModel = cartViewModel,
             )
         }
 
         composable(Routes.Cart.route) {
+            val buyerHomeEntry = remember(it) {
+                navController.getBackStackEntry(Routes.BuyerHome.route)
+            }
+            val cartViewModel: CartViewModel = hiltViewModel(buyerHomeEntry)
+
             CartScreen(
                 onBack = { navController.popBackStack() },
-                onCheckout = {
-                    navController.navigate(Routes.Checkout.route)
-                },
+                onCheckout = { navController.navigate(Routes.Checkout.route) },
+                viewModel = cartViewModel,
             )
         }
 
         composable(Routes.Checkout.route) {
+            val buyerHomeEntry = remember(it) {
+                navController.getBackStackEntry(Routes.BuyerHome.route)
+            }
+            val cartViewModel: CartViewModel = hiltViewModel(buyerHomeEntry)
+
             CheckoutScreen(
                 onBack = { navController.popBackStack() },
                 onOrderSuccess = {
@@ -183,23 +246,56 @@ fun BulkBasketNavHost(
                         popUpTo(Routes.BuyerHome.route)
                     }
                 },
+                cartViewModel = cartViewModel,
             )
         }
 
-        composable(Routes.ProductDetail.route) {
-            // Placeholder — will be built out later
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(text = "Product Detail — Coming Soon")
+        composable(
+            route = Routes.ProductDetail.route,
+            arguments = listOf(
+                navArgument("productId") { type = NavType.IntType }
+            ),
+        ) {
+            val buyerHomeEntry = remember(it) {
+                navController.getBackStackEntry(Routes.BuyerHome.route)
             }
+            val cartViewModel: CartViewModel = hiltViewModel(buyerHomeEntry)
+
+            ProductDetailScreen(
+                onBack = { navController.popBackStack() },
+                onViewCart = { navController.navigate(Routes.Cart.route) },
+                cartViewModel = cartViewModel,
+            )
+        }
+
+        composable(Routes.Notifications.route) {
+            NotificationsScreen(
+                onBack = { navController.popBackStack() },
+            )
         }
 
         composable(Routes.BuyerOrders.route) {
             BuyerOrdersScreen(
                 onBack = { navController.popBackStack() },
             )
+        }
+
+        composable(
+            route = Routes.BuyerOrderDetail.route,
+            arguments = listOf(
+                navArgument("orderId") { type = NavType.StringType }
+            ),
+        ) {
+            // placeholder for now
+        }
+
+        composable(
+            route = Routes.Tracking.route,
+            arguments = listOf(
+                navArgument("orderId") { type = NavType.StringType }
+            ),
+        ) {
+            // placeholder for now
         }
 
         composable(Routes.Profile.route) {

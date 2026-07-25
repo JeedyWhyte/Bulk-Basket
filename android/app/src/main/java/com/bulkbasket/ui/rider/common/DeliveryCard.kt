@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -26,6 +27,7 @@ fun DeliveryCard(
     delivery: Delivery,
     onAccept: ((Int) -> Unit)? = null,
     onUpdateStatus: ((Int, String) -> Unit)? = null,
+    onCardClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val nextStatus = when (delivery.status) {
@@ -35,7 +37,14 @@ fun DeliveryCard(
     }
 
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .then(
+                if (onCardClick != null)
+                    Modifier.clickable { onCardClick() }
+                else
+                    Modifier
+            ),
         shape = RoundedCornerShape(Dimensions.radiusMedium),
         elevation = CardDefaults.cardElevation(
             defaultElevation = Dimensions.cardElevation

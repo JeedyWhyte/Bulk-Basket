@@ -1,6 +1,7 @@
 package com.bulkbasket.domain.repository
 
 import com.bulkbasket.domain.model.Delivery
+import com.bulkbasket.domain.model.RiderProfile
 import com.bulkbasket.utils.NetworkResult
 
 interface IDeliveryRepository {
@@ -9,4 +10,7 @@ interface IDeliveryRepository {
     suspend fun acceptDelivery(id: Int): NetworkResult<Delivery>
     suspend fun updateDeliveryStatus(id: Int, status: String): NetworkResult<Delivery>
     suspend fun updateLocation(latitude: String, longitude: String): NetworkResult<Unit>
+    suspend fun getRiderProfile(): NetworkResult<RiderProfile>
+    suspend fun createRiderProfile(isAvailable: Boolean): NetworkResult<RiderProfile>
+    suspend fun updateRiderProfile(isAvailable: Boolean): NetworkResult<RiderProfile>
 }

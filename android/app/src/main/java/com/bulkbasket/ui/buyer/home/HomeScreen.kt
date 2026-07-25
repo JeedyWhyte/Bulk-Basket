@@ -31,6 +31,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
@@ -50,6 +51,7 @@ fun HomeScreen(
     onCartClick: () -> Unit,
     onOrdersClick: () -> Unit,
     onProfileClick: () -> Unit,
+    onNotificationsClick: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
     cartViewModel: CartViewModel = hiltViewModel(),
@@ -80,6 +82,13 @@ fun HomeScreen(
                     titleContentColor = MaterialTheme.colorScheme.onPrimary,
                 ),
                 actions = {
+                    IconButton(onClick = onNotificationsClick) {
+                        Icon(
+                            imageVector = Icons.Filled.Notifications,
+                            contentDescription = "Notifications",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    }
                     IconButton(onClick = onProfileClick) {
                         Icon(
                             imageVector = Icons.Filled.Person,

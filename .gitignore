@@ -1,5 +1,20 @@
-# Environment Variables
-.env
-.env.local
+# Firebase Admin SDK — contains private key, never commit
+backend/bulkbasket-firebase-adminsdk.json
+*.json.secret
 
-bulkbasket-1-firebase-adminsdk-fbsvc-27e65c2c9d.json
+# Android
+android/local.properties
+android/.gradle/
+android/app/google-services.json
+
+# Python / Django
+backend/venv/
+backend/.env
+backend/__pycache__/
+backend/**/__pycache__/
+backend/*.pyc
+backend/staticfiles/
+
+# General
+.DS_Store
+*.log

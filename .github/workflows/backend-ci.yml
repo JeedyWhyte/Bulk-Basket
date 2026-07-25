@@ -1,32 +1,69 @@
 name: Backend CI
 
 on:
+  push:
+    branches: [main, feat-Backend]
+    paths:
+      - 'backend/**'
   pull_request:
-    paths: ['backend/**']
+    branches: [main]
+    paths:
+      - 'backend/**'
 
 jobs:
   test:
     runs-on: ubuntu-latest
+
     services:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_DB: test_db
+          POSTGRES_DB: test_bulkbasket
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-        ports: ['5432:5432']
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: pip install -r backend/requirements-dev.txt
-      - run: |
+
+      - name: Install dependencies
+        run: |
           cd backend
-          python manage.py test
+          pip install -r requirements.txt
+
+      - name: Run migrations
+        run: |
+          cd backend
+          python manage.py migrate
         env:
-          DB_NAME: test_db
+          DJANGO_ENV: development
+          SECRET_KEY: ci-test-secret-key
+          DB_NAME: test_bulkbasket
           DB_USER: postgres
           DB_PASSWORD: postgres
           DB_HOST: localhost
+          DB_PORT: 5432
+
+      - name: Run tests
+        run: |
+          cd backend
+          pytest --tb=short
+        env:
+          DJANGO_ENV: development
+          SECRET_KEY: ci-test-secret-key
+          DB_NAME: test_bulkbasket
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          DB_HOST: localhost
+          DB_PORT: 5432

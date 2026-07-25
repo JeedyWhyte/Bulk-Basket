@@ -101,6 +101,11 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
 }
 
+FCM_CREDENTIALS_PATH = os.environ.get(
+    'FCM_CREDENTIALS_PATH',
+    os.path.join(BASE_DIR, 'bulkbasket-firebase-adminsdk.json')
+)
+
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'Africa/Lagos'
 USE_I18N = True

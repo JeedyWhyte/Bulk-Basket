@@ -17,7 +17,9 @@ class OrderRepository @Inject constructor(
         return try {
             val response = api.getOrders()
             if (response.isSuccessful) {
-                NetworkResult.Success(response.body()!!.map { it.toOrder() })
+                NetworkResult.Success(
+                    response.body()!!.results.map { it.toOrder() }
+                )
             } else {
                 NetworkResult.Error("Failed to load orders", response.code())
             }
@@ -45,7 +47,12 @@ class OrderRepository @Inject constructor(
         return try {
             val response = api.createOrder(request)
             if (response.isSuccessful) {
-                NetworkResult.Success(response.body()!!.toOrder())
+                val order = response.body()?.data?.toOrder()
+                if (order != null) {
+                    NetworkResult.Success(order)
+                } else {
+                    NetworkResult.Error("Failed to place order")
+                }
             } else {
                 NetworkResult.Error("Failed to place order", response.code())
             }
@@ -54,11 +61,14 @@ class OrderRepository @Inject constructor(
         }
     }
 
+
     override suspend fun getSellerOrders(): NetworkResult<List<Order>> {
         return try {
             val response = api.getSellerOrders()
             if (response.isSuccessful) {
-                NetworkResult.Success(response.body()!!.map { it.toOrder() })
+                NetworkResult.Success(
+                    response.body()!!.results.map { it.toOrder() }
+                )
             } else {
                 NetworkResult.Error("Failed to load orders", response.code())
             }
@@ -74,7 +84,12 @@ class OrderRepository @Inject constructor(
         return try {
             val response = api.updateOrderStatus(id, OrderStatusRequest(status))
             if (response.isSuccessful) {
-                NetworkResult.Success(response.body()!!.toOrder())
+                val order = response.body()?.data?.toOrder()
+                if (order != null) {
+                    NetworkResult.Success(order)
+                } else {
+                    NetworkResult.Error("Failed to update status")
+                }
             } else {
                 NetworkResult.Error("Failed to update status", response.code())
             }
