@@ -73,4 +73,17 @@ class ProductRepository @Inject constructor(
             NetworkResult.Error(e.message ?: "Network error")
         }
     }
+
+    override suspend fun getSellerDetail(id: Int): NetworkResult<Seller> {
+        return try {
+            val response = sellersApi.getSellerDetail(id)
+            if (response.isSuccessful) {
+                NetworkResult.Success(response.body()!!.toSeller())
+            } else {
+                NetworkResult.Error("Seller not found", response.code())
+            }
+        } catch (e: Exception) {
+            NetworkResult.Error(e.message ?: "Network error")
+        }
+    }
 }

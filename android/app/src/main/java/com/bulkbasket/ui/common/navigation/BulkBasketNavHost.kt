@@ -9,8 +9,17 @@ import com.bulkbasket.ui.auth.login.LoginScreen
 import com.bulkbasket.ui.auth.signup.SignupScreen
 import com.bulkbasket.ui.splash.SplashScreen
 import com.bulkbasket.ui.buyer.home.HomeScreen
+import com.bulkbasket.ui.buyer.sellerdetail.SellerDetailScreen
+import com.bulkbasket.ui.buyer.cart.CartScreen
+import com.bulkbasket.ui.buyer.checkout.CheckoutScreen
+import com.bulkbasket.ui.buyer.orders.BuyerOrdersScreen
+import com.bulkbasket.ui.buyer.profile.ProfileScreen
 import com.bulkbasket.ui.seller.dashboard.SellerDashboardScreen
 import com.bulkbasket.ui.rider.jobs.RiderJobsScreen
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Alignment
+import androidx.compose.material3.Text
 
 @Composable
 fun BulkBasketNavHost(
@@ -94,6 +103,15 @@ fun BulkBasketNavHost(
                         Routes.ProductDetail.createRoute(productId)
                     )
                 },
+                onCartClick = {
+                    navController.navigate(Routes.Cart.route)
+                },
+                onOrdersClick = {
+                    navController.navigate(Routes.BuyerOrders.route)
+                },
+                onProfileClick = {
+                    navController.navigate(Routes.Profile.route)
+                },
             )
         }
 
@@ -105,6 +123,68 @@ fun BulkBasketNavHost(
         // Rider screens
         composable(Routes.Jobs.route) {
             RiderJobsScreen()
+        }
+
+        // Seller Details
+        composable(Routes.SellerDetail.route) {
+            SellerDetailScreen(
+                onBack = { navController.popBackStack() },
+                onProductClick = { productId ->
+                    navController.navigate(
+                        Routes.ProductDetail.createRoute(productId)
+                    )
+                },
+                onViewCart = {
+                    navController.navigate(Routes.Cart.route)
+                },
+            )
+        }
+
+        composable(Routes.Cart.route) {
+            CartScreen(
+                onBack = { navController.popBackStack() },
+                onCheckout = {
+                    navController.navigate(Routes.Checkout.route)
+                },
+            )
+        }
+
+        composable(Routes.Checkout.route) {
+            CheckoutScreen(
+                onBack = { navController.popBackStack() },
+                onOrderSuccess = {
+                    navController.navigate(Routes.BuyerOrders.route) {
+                        popUpTo(Routes.BuyerHome.route)
+                    }
+                },
+            )
+        }
+
+        composable(Routes.ProductDetail.route) {
+            // Placeholder — will be built out later
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(text = "Product Detail — Coming Soon")
+            }
+        }
+
+        composable(Routes.BuyerOrders.route) {
+            BuyerOrdersScreen(
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.Profile.route) {
+            ProfileScreen(
+                onBack = { navController.popBackStack() },
+                onLogout = {
+                    navController.navigate(Routes.Login.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                },
+            )
         }
     }
 }

@@ -20,4 +20,6 @@ interface IProductRepository {
         lng: Double,
         radius: Double = 10.0,
     ): NetworkResult<List<Seller>>
+
+    suspend fun getSellerDetail(id: Int): NetworkResult<Seller>
 }

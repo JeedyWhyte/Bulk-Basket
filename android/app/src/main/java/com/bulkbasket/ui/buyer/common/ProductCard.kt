@@ -10,8 +10,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddShoppingCart
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,6 +35,7 @@ fun ProductCard(
     product: Product,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onAddToCart: (() -> Unit)? = null,
 ) {
     Card(
         modifier = modifier
@@ -48,7 +53,6 @@ fun ProductCard(
             modifier = Modifier.padding(Dimensions.paddingMedium),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Product image
             AsyncImage(
                 model = product.imageUrl,
                 contentDescription = product.name,
@@ -88,6 +92,16 @@ fun ProductCard(
                     else
                         MaterialTheme.colorScheme.error,
                 )
+            }
+
+            if (onAddToCart != null && product.inStock) {
+                IconButton(onClick = onAddToCart) {
+                    Icon(
+                        imageVector = Icons.Filled.AddShoppingCart,
+                        contentDescription = "Add to cart",
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
             }
         }
     }

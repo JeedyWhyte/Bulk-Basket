@@ -4,6 +4,8 @@ import com.bulkbasket.data.mappers.toUser
 import com.bulkbasket.data.remote.api.AuthApi
 import com.bulkbasket.data.remote.dto.LoginRequest
 import com.bulkbasket.data.remote.dto.RegisterRequest
+import com.bulkbasket.data.mappers.toAddress
+import com.bulkbasket.domain.model.Address
 import com.bulkbasket.domain.model.User
 import com.bulkbasket.domain.repository.IAuthRepository
 import com.bulkbasket.utils.NetworkResult
@@ -60,6 +62,34 @@ class AuthRepository @Inject constructor(
                 NetworkResult.Success(response.body()!!.toUser())
             } else {
                 NetworkResult.Error("Registration failed", response.code())
+            }
+        } catch (e: Exception) {
+            NetworkResult.Error(e.message ?: "Network error")
+        }
+    }
+
+    override suspend fun getProfile(): NetworkResult<User> {
+        return try {
+            val response = api.getProfile()
+            if (response.isSuccessful) {
+                NetworkResult.Success(response.body()!!.toUser())
+            } else {
+                NetworkResult.Error("Failed to load profile", response.code())
+            }
+        } catch (e: Exception) {
+            NetworkResult.Error(e.message ?: "Network error")
+        }
+    }
+
+    override suspend fun getAddresses(): NetworkResult<List<Address>> {
+        return try {
+            val response = api.getAddresses()
+            if (response.isSuccessful) {
+                NetworkResult.Success(
+                    response.body()!!.map { it.toAddress() }
+                )
+            } else {
+                NetworkResult.Error("Failed to load addresses", response.code())
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")
