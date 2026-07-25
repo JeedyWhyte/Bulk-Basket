@@ -2,7 +2,7 @@ name: Backend CI
 
 on:
   push:
-    branches: [main, feat-Backend]
+    branches: [main, feat/python/backend, feat/android/backend, feat/UI ]
     paths:
       - 'backend/**'
   pull_request:
@@ -41,6 +41,7 @@ jobs:
         run: |
           cd backend
           pip install -r requirements.txt
+          pip install pytest pytest-django pytest-cov
 
       - name: Run migrations
         run: |
@@ -58,7 +59,7 @@ jobs:
       - name: Run tests
         run: |
           cd backend
-          pytest --tb=short
+          pytest --tb=short -v
         env:
           DJANGO_ENV: development
           SECRET_KEY: ci-test-secret-key
