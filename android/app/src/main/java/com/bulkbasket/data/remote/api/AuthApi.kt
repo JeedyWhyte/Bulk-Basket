@@ -2,6 +2,7 @@ package com.bulkbasket.data.remote.api
 
 import com.bulkbasket.data.remote.dto.AddressDto
 import com.bulkbasket.data.remote.dto.AddressRequest
+import com.bulkbasket.data.remote.dto.ApiResponse
 import com.bulkbasket.data.remote.dto.LoginRequest
 import com.bulkbasket.data.remote.dto.LoginResponse
 import com.bulkbasket.data.remote.dto.RegisterRequest
@@ -14,7 +15,7 @@ import retrofit2.http.PUT
 
 interface AuthApi {
     @POST("users/register/")
-    suspend fun register(@Body request: RegisterRequest): Response<UserDto>
+    suspend fun register(@Body request: RegisterRequest): Response<ApiResponse<UserDto>>
 
     @POST("users/login/")
     suspend fun login(@Body request: LoginRequest): Response<LoginResponse>

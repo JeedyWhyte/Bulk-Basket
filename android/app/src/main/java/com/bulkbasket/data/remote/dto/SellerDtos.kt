@@ -23,3 +23,13 @@ data class NearbySellerRequest(
     val lng: Double,
     val radius: Double = 10.0,
 )
+
+data class SellerProfileCreateRequest(
+    val business_name: String,
+    val market_name: String,
+    val description: String,
+    val latitude: String?,
+    val longitude: String?,
+    val opening_time: String?,
+    val closing_time: String?,
+)

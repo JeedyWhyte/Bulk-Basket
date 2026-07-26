@@ -4,6 +4,8 @@ import com.bulkbasket.data.mappers.toUser
 import com.bulkbasket.data.remote.api.AuthApi
 import com.bulkbasket.data.remote.dto.LoginRequest
 import com.bulkbasket.data.remote.dto.RegisterRequest
+import com.bulkbasket.data.mappers.toAddress
+import com.bulkbasket.domain.model.Address
 import com.bulkbasket.domain.model.User
 import com.bulkbasket.domain.repository.IAuthRepository
 import com.bulkbasket.utils.NetworkResult
@@ -29,8 +31,8 @@ class AuthRepository @Inject constructor(
                 if (profileResponse.isSuccessful) {
                     val user = profileResponse.body()!!.toUser()
                     prefs.saveUserInfo(
-                        role = user.role,
-                        username = user.username,
+                        role = user.role ?: "",
+                        username = user.username ?: "",
                         userId = user.id.toString(),
                     )
                     NetworkResult.Success(user)
@@ -57,9 +59,43 @@ class AuthRepository @Inject constructor(
                 RegisterRequest(username, email, password, role, phone)
             )
             if (response.isSuccessful) {
+                val user = response.body()?.data?.toUser()
+                if (user != null) {
+                    NetworkResult.Success(user)
+                } else {
+                    NetworkResult.Error("Registration failed — empty response")
+                }
+            } else {
+                val errorBody = response.errorBody()?.string()
+                NetworkResult.Error(errorBody ?: "Registration failed", response.code())
+            }
+        } catch (e: Exception) {
+            NetworkResult.Error(e.message ?: "Network error")
+        }
+    }
+
+    override suspend fun getProfile(): NetworkResult<User> {
+        return try {
+            val response = api.getProfile()
+            if (response.isSuccessful) {
                 NetworkResult.Success(response.body()!!.toUser())
             } else {
-                NetworkResult.Error("Registration failed", response.code())
+                NetworkResult.Error("Failed to load profile", response.code())
+            }
+        } catch (e: Exception) {
+            NetworkResult.Error(e.message ?: "Network error")
+        }
+    }
+
+    override suspend fun getAddresses(): NetworkResult<List<Address>> {
+        return try {
+            val response = api.getAddresses()
+            if (response.isSuccessful) {
+                NetworkResult.Success(
+                    response.body()!!.map { it.toAddress() }
+                )
+            } else {
+                NetworkResult.Error("Failed to load addresses", response.code())
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")

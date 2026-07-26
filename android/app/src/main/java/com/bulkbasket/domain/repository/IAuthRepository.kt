@@ -2,6 +2,7 @@ package com.bulkbasket.domain.repository
 
 import com.bulkbasket.domain.model.User
 import com.bulkbasket.utils.NetworkResult
+import com.bulkbasket.domain.model.Address
 
 interface IAuthRepository {
     suspend fun login(username: String, password: String): NetworkResult<User>
@@ -13,4 +14,6 @@ interface IAuthRepository {
         phone: String,
     ): NetworkResult<User>
     suspend fun logout()
+    suspend fun getProfile(): NetworkResult<User>
+    suspend fun getAddresses(): NetworkResult<List<Address>>
 }

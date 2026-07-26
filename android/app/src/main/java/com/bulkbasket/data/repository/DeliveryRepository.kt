@@ -4,6 +4,9 @@ import com.bulkbasket.data.mappers.toDelivery
 import com.bulkbasket.data.remote.api.DeliveryApi
 import com.bulkbasket.data.remote.dto.DeliveryStatusRequest
 import com.bulkbasket.data.remote.dto.LocationUpdateRequest
+import com.bulkbasket.data.mappers.toRiderProfile
+import com.bulkbasket.data.remote.dto.RiderProfileRequest
+import com.bulkbasket.domain.model.RiderProfile
 import com.bulkbasket.domain.model.Delivery
 import com.bulkbasket.domain.repository.IDeliveryRepository
 import com.bulkbasket.utils.NetworkResult
@@ -80,6 +83,53 @@ class DeliveryRepository @Inject constructor(
                 NetworkResult.Success(Unit)
             } else {
                 NetworkResult.Error("Failed to update location", response.code())
+            }
+        } catch (e: Exception) {
+            NetworkResult.Error(e.message ?: "Network error")
+        }
+    }
+
+    override suspend fun getRiderProfile(): NetworkResult<RiderProfile> {
+        return try {
+            val response = api.getRiderProfile()
+            if (response.isSuccessful) {
+                NetworkResult.Success(response.body()!!.toRiderProfile())
+            } else {
+                NetworkResult.Error("Profile not found", response.code())
+            }
+        } catch (e: Exception) {
+            NetworkResult.Error(e.message ?: "Network error")
+        }
+    }
+
+    override suspend fun createRiderProfile(
+        isAvailable: Boolean
+    ): NetworkResult<RiderProfile> {
+        return try {
+            val response = api.createRiderProfile(
+                RiderProfileRequest(is_available = isAvailable)
+            )
+            if (response.isSuccessful) {
+                NetworkResult.Success(response.body()!!.toRiderProfile())
+            } else {
+                NetworkResult.Error("Failed to create profile", response.code())
+            }
+        } catch (e: Exception) {
+            NetworkResult.Error(e.message ?: "Network error")
+        }
+    }
+
+    override suspend fun updateRiderProfile(
+        isAvailable: Boolean
+    ): NetworkResult<RiderProfile> {
+        return try {
+            val response = api.updateRiderProfile(
+                RiderProfileRequest(is_available = isAvailable)
+            )
+            if (response.isSuccessful) {
+                NetworkResult.Success(response.body()!!.toRiderProfile())
+            } else {
+                NetworkResult.Error("Failed to update profile", response.code())
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")

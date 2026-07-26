@@ -28,6 +28,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material3.IconButton
+import com.bulkbasket.ui.buyer.cart.CartViewModel
 import com.bulkbasket.ui.buyer.common.ProductCard
 import com.bulkbasket.ui.buyer.common.SellerCard
 import com.bulkbasket.ui.theme.Dimensions
@@ -37,10 +48,16 @@ import com.bulkbasket.ui.theme.Dimensions
 fun HomeScreen(
     onSellerClick: (Int) -> Unit,
     onProductClick: (Int) -> Unit,
+    onCartClick: () -> Unit,
+    onOrdersClick: () -> Unit,
+    onProfileClick: () -> Unit,
+    onNotificationsClick: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
+    cartViewModel: CartViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+    val cartState by cartViewModel.state.collectAsState()
     val isRefreshing = state.isLoadingSellers || state.isLoadingProducts
 
     Scaffold(
@@ -64,6 +81,44 @@ fun HomeScreen(
                     containerColor = MaterialTheme.colorScheme.primary,
                     titleContentColor = MaterialTheme.colorScheme.onPrimary,
                 ),
+                actions = {
+                    IconButton(onClick = onNotificationsClick) {
+                        Icon(
+                            imageVector = Icons.Filled.Notifications,
+                            contentDescription = "Notifications",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    }
+                    IconButton(onClick = onProfileClick) {
+                        Icon(
+                            imageVector = Icons.Filled.Person,
+                            contentDescription = "Profile",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    }
+                    IconButton(onClick = onOrdersClick) {
+                        Icon(
+                            imageVector = Icons.Filled.Receipt,
+                            contentDescription = "My Orders",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    }
+                    BadgedBox(
+                        badge = {
+                            if (cartState.itemCount > 0) {
+                                Badge { Text(cartState.itemCount.toString()) }
+                            }
+                        },
+                    ) {
+                        IconButton(onClick = onCartClick) {
+                            Icon(
+                                imageVector = Icons.Filled.ShoppingCart,
+                                contentDescription = "Cart",
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                            )
+                        }
+                    }
+                },
             )
         },
     ) { innerPadding ->

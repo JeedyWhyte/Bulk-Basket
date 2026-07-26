@@ -5,10 +5,10 @@ import com.bulkbasket.domain.model.User
 
 fun UserDto.toUser() = User(
     id = id,
-    username = username,
-    email = email,
-    role = role,
-    phoneNumber = phone_number,
+    username = username ?: "",
+    email = email ?: "",
+    role = role ?: "buyer",
+    phoneNumber = phone_number ?: "",
     avatarUrl = avatar_url,
-    isVerified = is_verified,
+    isVerified = is_verified ?: false,
 )

@@ -18,8 +18,8 @@ data class HomeState(
     val nearbySellers: List<Seller> = emptyList(),
     val featuredProducts: List<Product> = emptyList(),
     val error: String? = null,
-    val userLat: Double = 6.5244,
-    val userLng: Double = 3.3792,
+    val userLat: Double = 6.6018,
+    val userLng: Double = 3.3515,
 )
 
 @HiltViewModel
@@ -45,6 +45,7 @@ class HomeViewModel @Inject constructor(
             when (val result = productRepository.getNearbySellers(
                 lat = _state.value.userLat,
                 lng = _state.value.userLng,
+                radius = 50.0,
             )) {
                 is NetworkResult.Success -> {
                     _state.value = _state.value.copy(
@@ -66,7 +67,9 @@ class HomeViewModel @Inject constructor(
     private fun loadFeaturedProducts() {
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoadingProducts = true)
-            when (val result = productRepository.getProducts()) {
+            when (val result = productRepository.getProducts(
+                page = 1,
+            )) {
                 is NetworkResult.Success -> {
                     _state.value = _state.value.copy(
                         isLoadingProducts = false,

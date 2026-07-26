@@ -10,6 +10,7 @@ import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.PATCH
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Path
 
 interface DeliveryApi {
@@ -40,4 +41,9 @@ interface DeliveryApi {
 
     @GET("delivery/profile/me/")
     suspend fun getRiderProfile(): Response<RiderProfileDto>
+
+    @PUT("delivery/profile/me/")
+    suspend fun updateRiderProfile(
+        @Body request: RiderProfileRequest,
+    ): Response<RiderProfileDto>
 }

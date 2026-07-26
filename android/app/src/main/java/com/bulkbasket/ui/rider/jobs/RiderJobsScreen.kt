@@ -10,7 +10,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
@@ -36,6 +41,9 @@ import com.bulkbasket.ui.theme.Dimensions
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RiderJobsScreen(
+    onProfileClick: () -> Unit,
+    onActiveDeliveryClick: (Int) -> Unit,
+    onNotificationsClick: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: RiderJobsViewModel = hiltViewModel(),
 ) {
@@ -66,6 +74,22 @@ fun RiderJobsScreen(
                     containerColor = MaterialTheme.colorScheme.primary,
                     titleContentColor = MaterialTheme.colorScheme.onPrimary,
                 ),
+                actions = {
+                    IconButton(onClick = onNotificationsClick) {
+                        Icon(
+                            imageVector = Icons.Filled.Notifications,
+                            contentDescription = "Notifications",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    }
+                    IconButton(onClick = onProfileClick) {
+                        Icon(
+                            imageVector = Icons.Filled.Person,
+                            contentDescription = "Profile",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    }
+                },
             )
         },
     ) { innerPadding ->
@@ -160,10 +184,9 @@ fun RiderJobsScreen(
                                     DeliveryCard(
                                         delivery = delivery,
                                         onUpdateStatus = { id, status ->
-                                            viewModel.updateDeliveryStatus(
-                                                id, status
-                                            )
+                                            viewModel.updateDeliveryStatus(id, status)
                                         },
+                                        onCardClick = { onActiveDeliveryClick(delivery.id) },
                                     )
                                 }
                             }

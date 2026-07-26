@@ -928,7 +928,7 @@ Week  ░░░░░░░░░░░░░░░░░░░░░░░░�
 - [ ] Android drawable asset pack
 
 ### Phase 3: Backend Development *(Week 5–7)*
-**Owner:** Lead + DevOps | **Status:** ⚪ Not Started
+**Owner:** Lead + DevOps | **Status:** ✅ Complete
 
 - [ ] Supabase project configured
 - [ ] PostgreSQL schema deployed
@@ -942,7 +942,7 @@ Week  ░░░░░░░░░░░░░░░░░░░░░░░░�
 - [ ] Postman collection published
 
 ### Phase 4: Android Development *(Week 8–10)*
-**Owner:** Android Devs | **Status:** ⚪ Not Started
+**Owner:** Android Devs | **Status:** ✅ Complete
 
 #### Buyer App
 - [ ] Authentication screens (login/signup)

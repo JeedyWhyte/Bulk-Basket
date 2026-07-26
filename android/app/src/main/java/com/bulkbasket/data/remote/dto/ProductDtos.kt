@@ -31,3 +31,14 @@ data class PaginatedResponse<T>(
     val previous: String?,
     val results: List<T>,
 )
+
+data class ProductCreateRequest(
+    val name: String,
+    val description: String,
+    val price: String,
+    val unit: String,
+    val min_order_qty: Int,
+    val stock_quantity: Int,
+    val is_available: Boolean,
+    val category: Int? = null,
+)
