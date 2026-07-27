@@ -66,6 +66,9 @@ dependencies {
     // Navigation
     implementation(libs.androidx.navigation.compose)
 
+    // Google Fonts
+    implementation("androidx.compose.ui:ui-text-google-fonts:1.7.0")
+
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

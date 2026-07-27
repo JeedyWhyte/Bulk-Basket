@@ -56,6 +56,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.bulkbasket.ui.theme.Dimensions
 import com.bulkbasket.ui.theme.Green50
 import com.bulkbasket.ui.theme.Green600
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.SettingsBrightness
+import androidx.compose.material3.Surface
+import com.bulkbasket.ui.theme.ThemeMode
+import com.bulkbasket.ui.theme.ThemeViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,6 +70,7 @@ fun ProfileScreen(
     onLogout: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ProfileViewModel = hiltViewModel(),
+    themeViewModel: ThemeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
     var showLogoutDialog by remember { mutableStateOf(false) }
@@ -113,15 +120,6 @@ fun ProfileScreen(
                         text = "My Profile",
                         fontWeight = FontWeight.Bold,
                     )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                        )
-                    }
                 },
                 actions = {
                     IconButton(onClick = { showLogoutDialog = true }) {
@@ -413,6 +411,78 @@ fun ProfileScreen(
                             }
                         }
 
+                        // Theme selector
+                        item {
+                            Spacer(modifier = Modifier.height(Dimensions.paddingLarge))
+                            Text(
+                                text = "Appearance",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(
+                                    horizontal = Dimensions.paddingLarge,
+                                    vertical = Dimensions.paddingSmall,
+                                ),
+                            )
+                        }
+
+                        item {
+                            val themeMode by themeViewModel.themeMode.collectAsState()
+
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = Dimensions.paddingLarge),
+                                shape = RoundedCornerShape(Dimensions.radiusMedium),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surface,
+                                ),
+                                elevation = CardDefaults.cardElevation(
+                                    defaultElevation = Dimensions.cardElevation
+                                ),
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(Dimensions.paddingMedium),
+                                ) {
+                                    Text(
+                                        text = "Theme",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
+
+                                    Spacer(modifier = Modifier.height(Dimensions.paddingMedium))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(
+                                            Dimensions.paddingSmall
+                                        ),
+                                    ) {
+                                        ThemeOption(
+                                            label = "Light",
+                                            icon = Icons.Filled.LightMode,
+                                            selected = themeMode == ThemeMode.LIGHT,
+                                            onClick = { themeViewModel.setTheme(ThemeMode.LIGHT) },
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                        ThemeOption(
+                                            label = "Dark",
+                                            icon = Icons.Filled.DarkMode,
+                                            selected = themeMode == ThemeMode.DARK,
+                                            onClick = { themeViewModel.setTheme(ThemeMode.DARK) },
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                        ThemeOption(
+                                            label = "System",
+                                            icon = Icons.Filled.SettingsBrightness,
+                                            selected = themeMode == ThemeMode.SYSTEM,
+                                            onClick = { themeViewModel.setTheme(ThemeMode.SYSTEM) },
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
                         // Logout button
                         item {
                             Spacer(modifier = Modifier.height(Dimensions.paddingLarge))
@@ -469,6 +539,54 @@ private fun ProfileInfoRow(
                 text = value,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ThemeOption(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(Dimensions.radiusSmall),
+        color = if (selected)
+            MaterialTheme.colorScheme.primaryContainer
+        else
+            MaterialTheme.colorScheme.surfaceVariant,
+        border = if (selected) androidx.compose.foundation.BorderStroke(
+            width = 2.dp,
+            color = MaterialTheme.colorScheme.primary,
+        ) else null,
+    ) {
+        Column(
+            modifier = Modifier.padding(Dimensions.paddingSmall),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = if (selected)
+                    MaterialTheme.colorScheme.primary
+                else
+                    MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = if (selected)
+                    MaterialTheme.colorScheme.primary
+                else
+                    MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
             )
         }
     }

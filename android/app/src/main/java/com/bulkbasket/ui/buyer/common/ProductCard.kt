@@ -1,16 +1,21 @@
 package com.bulkbasket.ui.buyer.common
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddShoppingCart
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -29,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.bulkbasket.domain.model.Product
 import com.bulkbasket.ui.theme.Dimensions
+import com.bulkbasket.ui.theme.Primary50
+import com.bulkbasket.ui.theme.Primary700
 
 @Composable
 fun ProductCard(
@@ -49,59 +56,112 @@ fun ProductCard(
             containerColor = MaterialTheme.colorScheme.surface,
         ),
     ) {
-        Row(
-            modifier = Modifier.padding(Dimensions.paddingMedium),
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(Dimensions.paddingSmall),
         ) {
-            AsyncImage(
-                model = product.imageUrl,
-                contentDescription = product.name,
+            // Product image or icon placeholder
+            Box(
                 modifier = Modifier
-                    .size(72.dp)
-                    .clip(RoundedCornerShape(Dimensions.radiusSmall)),
-                contentScale = ContentScale.Crop,
-            )
-
-            Spacer(modifier = Modifier.width(Dimensions.paddingMedium))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = product.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = product.sellerName,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "₦${product.price} / ${product.unit}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    text = if (product.inStock) "In Stock" else "Out of Stock",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (product.inStock)
-                        MaterialTheme.colorScheme.primary
-                    else
-                        MaterialTheme.colorScheme.error,
-                )
-            }
-
-            if (onAddToCart != null && product.inStock) {
-                IconButton(onClick = onAddToCart) {
-                    Icon(
-                        imageVector = Icons.Filled.AddShoppingCart,
-                        contentDescription = "Add to cart",
-                        tint = MaterialTheme.colorScheme.primary,
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .clip(RoundedCornerShape(Dimensions.radiusSmall))
+                    .background(Primary50),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (product.imageUrl != null) {
+                    AsyncImage(
+                        model = product.imageUrl,
+                        contentDescription = product.name,
+                        modifier = Modifier.fillMaxWidth(),
+                        contentScale = ContentScale.Crop,
+                    )
+                } else {
+                    Text(
+                        text = product.name.first().uppercaseChar().toString(),
+                        style = MaterialTheme.typography.headlineLarge,
+                        color = Primary700,
+                        fontWeight = FontWeight.Bold,
                     )
                 }
+            }
+
+            Spacer(modifier = Modifier.height(Dimensions.paddingSmall))
+
+            // Product name
+            Text(
+                text = product.name,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+
+            // Seller name
+            Text(
+                text = product.sellerName,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+
+            // Unit and stock
+            Text(
+                text = "${product.unit} · ${product.stockQuantity} in stock",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+
+            Spacer(modifier = Modifier.height(Dimensions.paddingXSmall))
+
+            // Price and add button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "₦${product.price}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+
+                if (onAddToCart != null && product.inStock) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(Primary700)
+                            .clickable { onAddToCart() },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Add,
+                            contentDescription = "Add to cart",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
+            }
+
+            // Stock status
+            if (!product.inStock) {
+                Text(
+                    text = "Out of Stock",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    fontWeight = FontWeight.Medium,
+                )
             }
         }
     }

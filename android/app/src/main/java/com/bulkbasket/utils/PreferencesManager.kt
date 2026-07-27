@@ -21,6 +21,7 @@ class PreferencesManager @Inject constructor(
         val USER_ROLE = stringPreferencesKey("user_role")
         val USER_ID = stringPreferencesKey("user_id")
         val USERNAME = stringPreferencesKey("username")
+        val THEME_MODE = stringPreferencesKey("theme_mode")
     }
 
     val accessToken: Flow<String> = context.dataStore.data
@@ -52,5 +53,13 @@ class PreferencesManager @Inject constructor(
 
     suspend fun clear() {
         context.dataStore.edit { it.clear() }
+    }
+
+
+    val themeMode: Flow<String> = context.dataStore.data
+        .map { it[THEME_MODE] ?: "system" }
+
+    suspend fun saveThemeMode(mode: String) {
+        context.dataStore.edit { it[THEME_MODE] = mode }
     }
 }

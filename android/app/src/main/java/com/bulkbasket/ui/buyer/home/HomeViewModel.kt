@@ -6,6 +6,7 @@ import com.bulkbasket.domain.model.Product
 import com.bulkbasket.domain.model.Seller
 import com.bulkbasket.domain.repository.IProductRepository
 import com.bulkbasket.utils.NetworkResult
+import com.bulkbasket.utils.PreferencesManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,6 +19,7 @@ data class HomeState(
     val nearbySellers: List<Seller> = emptyList(),
     val featuredProducts: List<Product> = emptyList(),
     val error: String? = null,
+    val username: String = "",
     val userLat: Double = 6.6018,
     val userLng: Double = 3.3515,
 )
@@ -25,13 +27,23 @@ data class HomeState(
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val productRepository: IProductRepository,
+    private val prefs: PreferencesManager,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(HomeState())
     val state: StateFlow<HomeState> = _state
 
     init {
+        loadUsername()
         loadHomeData()
+    }
+
+    private fun loadUsername() {
+        viewModelScope.launch {
+            prefs.username.collect { name ->
+                _state.value = _state.value.copy(username = name)
+            }
+        }
     }
 
     fun loadHomeData() {

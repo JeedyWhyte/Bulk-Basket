@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.bulkbasket.ui.theme.ThemeMode
+import com.bulkbasket.ui.theme.ThemeViewModel
 
 data class RiderProfileState(
     val isLoading: Boolean = false,

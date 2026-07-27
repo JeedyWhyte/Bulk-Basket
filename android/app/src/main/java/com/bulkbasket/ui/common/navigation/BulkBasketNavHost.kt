@@ -16,6 +16,7 @@ import com.bulkbasket.ui.buyer.cart.CartScreen
 import com.bulkbasket.ui.buyer.checkout.CheckoutScreen
 import com.bulkbasket.ui.buyer.orders.BuyerOrdersScreen
 import com.bulkbasket.ui.buyer.profile.ProfileScreen
+import com.bulkbasket.ui.buyer.BuyerShellScreen
 import com.bulkbasket.ui.seller.dashboard.SellerDashboardScreen
 import com.bulkbasket.ui.seller.inventory.InventoryScreen
 import com.bulkbasket.ui.seller.profile.SellerProfileScreen
@@ -104,19 +105,23 @@ fun BulkBasketNavHost(
         // Buyer screens
         composable(Routes.BuyerHome.route) {
             val cartViewModel: CartViewModel = hiltViewModel(it)
-
-            HomeScreen(
-                onSellerClick = { sellerId ->
+            BuyerShellScreen(
+                onNavigateToSeller = { sellerId ->
                     navController.navigate(Routes.SellerDetail.createRoute(sellerId))
                 },
-                onProductClick = { productId ->
+                onNavigateToProduct = { productId ->
                     navController.navigate(Routes.ProductDetail.createRoute(productId))
                 },
-                onCartClick = { navController.navigate(Routes.Cart.route) },
-                onOrdersClick = { navController.navigate(Routes.BuyerOrders.route) },
-                onProfileClick = { navController.navigate(Routes.Profile.route) },
-                onNotificationsClick = {
+                onNavigateToCart = {
+                    navController.navigate(Routes.Cart.route)
+                },
+                onNavigateToNotifications = {
                     navController.navigate(Routes.Notifications.route)
+                },
+                onLogout = {
+                    navController.navigate(Routes.Login.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
                 },
                 cartViewModel = cartViewModel,
             )

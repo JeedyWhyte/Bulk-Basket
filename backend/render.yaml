@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: bulkbasket-backend
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
+    envVars:
+      - key: DJANGO_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_HOSTS
+        value: bulkbasket-backend.onrender.com
+      - key: PYTHON_VERSION
+        value: 3.11.9

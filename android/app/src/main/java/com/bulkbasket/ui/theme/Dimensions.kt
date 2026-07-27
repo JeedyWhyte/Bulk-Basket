@@ -25,7 +25,7 @@ object Dimensions {
     val buttonHeight   = 52.dp
     val inputHeight    = 56.dp
     val appBarHeight   = 64.dp
-    val bottomBarHeight = 64.dp
+    val bottomBarHeight = 60.dp
 
     // Card
     val cardElevation  = 2.dp
