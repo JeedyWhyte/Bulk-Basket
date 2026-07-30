@@ -22,7 +22,7 @@ This folder contains all design assets for BulkBasket.
 | Neutral 50 | `#FAFAFA` | Background (light mode) |
 
 ## Figma Link
-[BulkBasket Design System]() 
+[BulkBasket Design System](https://claude.ai/public/artifacts/01baf10a-b696-4986-a39a-9d4b91dea1a2) 
 
 ## Screen Inventory
 

@@ -18,3 +18,4 @@ backend/staticfiles/
 # General
 .DS_Store
 *.log
+.claude/
