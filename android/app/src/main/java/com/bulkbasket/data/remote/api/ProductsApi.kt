@@ -22,6 +22,7 @@ interface ProductsApi {
         @Query("min_price") minPrice: Double? = null,
         @Query("max_price") maxPrice: Double? = null,
         @Query("page") page: Int = 1,
+        @Query("page_size") pageSize: Int? = null,
     ): Response<PaginatedResponse<ProductDto>>
 
     @GET("products/{id}/")

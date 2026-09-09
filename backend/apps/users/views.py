@@ -8,7 +8,7 @@ from .serializers import (
     UserProfileSerializer,
     AddressSerializer,
 )
-from .services import update_fcm_token
+from .services import update_fcm_token, close_account
 
 
 class RegisterView(generics.CreateAPIView):
@@ -43,6 +43,15 @@ class AddressListCreateView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def close_account_view(request):
+    """Deactivate the caller's own account. Irreversible from the app —
+    re-enabling a closed account is an admin action."""
+    close_account(request.user)
+    return success_response(message="Your account has been deactivated.")
 
 
 @api_view(['POST'])

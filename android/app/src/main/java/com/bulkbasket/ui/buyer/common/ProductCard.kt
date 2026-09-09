@@ -35,8 +35,6 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.bulkbasket.domain.model.Product
 import com.bulkbasket.ui.theme.Dimensions
-import com.bulkbasket.ui.theme.Primary50
-import com.bulkbasket.ui.theme.Primary700
 
 @Composable
 fun ProductCard(
@@ -86,7 +84,7 @@ fun ProductCard(
                     Text(
                         text = product.name.first().uppercaseChar().toString(),
                         style = MaterialTheme.typography.headlineLarge,
-                        color = Primary700,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                         fontWeight = FontWeight.Bold,
                     )
                 }
@@ -145,7 +143,7 @@ fun ProductCard(
                         modifier = Modifier
                             .size(32.dp)
                             .clip(CircleShape)
-                            .background(Primary700)
+                            .background(MaterialTheme.colorScheme.primary)
                             .clickable { onAddToCart() },
                         contentAlignment = Alignment.Center,
                     ) {

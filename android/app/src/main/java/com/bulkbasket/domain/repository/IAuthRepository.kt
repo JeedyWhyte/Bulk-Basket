@@ -14,7 +14,13 @@ interface IAuthRepository {
         phone: String,
     ): NetworkResult<User>
     suspend fun logout()
+    suspend fun closeAccount(): NetworkResult<Unit>
     suspend fun getProfile(): NetworkResult<User>
+    suspend fun updateProfile(
+        username: String,
+        email: String,
+        phoneNumber: String,
+    ): NetworkResult<User>
     suspend fun getAddresses(): NetworkResult<List<Address>>
     suspend fun createAddress(
         label: String,

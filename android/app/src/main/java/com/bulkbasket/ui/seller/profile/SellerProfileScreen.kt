@@ -53,13 +53,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.bulkbasket.ui.theme.Dimensions
-import com.bulkbasket.ui.theme.Green50
-import com.bulkbasket.ui.theme.Green600
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.SettingsBrightness
 import androidx.compose.material3.Surface
-import com.bulkbasket.ui.common.components.CurvedTopAppBar
 import com.bulkbasket.ui.theme.ThemeMode
 import com.bulkbasket.ui.theme.ThemeViewModel
 
@@ -261,7 +258,7 @@ fun SellerProfileScreen(
                                     modifier = Modifier
                                         .size(80.dp)
                                         .clip(CircleShape)
-                                        .background(Green50),
+                                        .background(MaterialTheme.colorScheme.primaryContainer),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Text(
@@ -270,7 +267,7 @@ fun SellerProfileScreen(
                                             .uppercaseChar()
                                             .toString(),
                                         style = MaterialTheme.typography.displayMedium,
-                                        color = Green600,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                                         fontWeight = FontWeight.Bold,
                                     )
                                 }

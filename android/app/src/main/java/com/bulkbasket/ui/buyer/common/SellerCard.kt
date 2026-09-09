@@ -27,8 +27,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bulkbasket.domain.model.Seller
 import com.bulkbasket.ui.theme.Dimensions
-import com.bulkbasket.ui.theme.Green50
-import com.bulkbasket.ui.theme.Green600
 
 @Composable
 fun SellerCard(
@@ -54,13 +52,13 @@ fun SellerCard(
                 modifier = Modifier
                     .size(48.dp)
                     .clip(CircleShape)
-                    .background(Green50),
+                    .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = seller.businessName.first().uppercaseChar().toString(),
                     style = MaterialTheme.typography.titleLarge,
-                    color = Green600,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
                     fontWeight = FontWeight.Bold,
                 )
             }

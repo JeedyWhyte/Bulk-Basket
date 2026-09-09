@@ -64,6 +64,15 @@ fun ProfileScreen(
     onBack: () -> Unit,
     onLogout: () -> Unit,
     onOrdersClick: () -> Unit = {},
+    onEditProfileClick: () -> Unit = {},
+    onInboxClick: () -> Unit = {},
+    onRatingsClick: () -> Unit = {},
+    onPaymentSettingsClick: () -> Unit = {},
+    onAppSettingsClick: () -> Unit = {},
+    onNotificationPreferencesClick: () -> Unit = {},
+    onCloseAccountClick: () -> Unit = {},
+    onPrivacyPolicyClick: () -> Unit = {},
+    onHelpSupportClick: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: ProfileViewModel = hiltViewModel(),
     themeViewModel: ThemeViewModel = hiltViewModel(),
@@ -282,7 +291,7 @@ fun ProfileScreen(
                             icon = Icons.Filled.Person,
                             label = "Profile",
                             subtitle = "Edit your personal details",
-                            onClick = {},
+                            onClick = onEditProfileClick,
                         )
                         MenuDivider()
                         MenuItem(
@@ -296,14 +305,14 @@ fun ProfileScreen(
                             icon = Icons.Filled.Inbox,
                             label = "Inbox",
                             subtitle = "Messages and updates",
-                            onClick = {},
+                            onClick = onInboxClick,
                         )
                         MenuDivider()
                         MenuItem(
                             icon = Icons.Filled.Star,
                             label = "Ratings & Reviews",
                             subtitle = "Your feedback on sellers",
-                            onClick = {},
+                            onClick = onRatingsClick,
                         )
                     }
 
@@ -317,28 +326,28 @@ fun ProfileScreen(
                             icon = Icons.Filled.Payment,
                             label = "Payment Settings",
                             subtitle = "Manage payment methods",
-                            onClick = {},
+                            onClick = onPaymentSettingsClick,
                         )
                         MenuDivider()
                         MenuItem(
                             icon = Icons.Filled.Settings,
                             label = "App Settings",
                             subtitle = "Language, region and more",
-                            onClick = {},
+                            onClick = onAppSettingsClick,
                         )
                         MenuDivider()
                         MenuItem(
                             icon = Icons.Filled.Notifications,
                             label = "Notification Preferences",
                             subtitle = "Control what you hear from us",
-                            onClick = {},
+                            onClick = onNotificationPreferencesClick,
                         )
                         MenuDivider()
                         MenuItem(
                             icon = Icons.Filled.Close,
                             label = "Close Account",
                             subtitle = "Permanently delete your account",
-                            onClick = {},
+                            onClick = onCloseAccountClick,
                             isDestructive = true,
                         )
                     }
@@ -353,14 +362,14 @@ fun ProfileScreen(
                             icon = Icons.Filled.Policy,
                             label = "Privacy Policy",
                             subtitle = "How we handle your data",
-                            onClick = {},
+                            onClick = onPrivacyPolicyClick,
                         )
                         MenuDivider()
                         MenuItem(
                             icon = Icons.Filled.Help,
                             label = "Help & Support",
                             subtitle = "Get help with your account",
-                            onClick = {},
+                            onClick = onHelpSupportClick,
                         )
                     }
 

@@ -17,9 +17,6 @@ object Dimensions {
     val radiusXLarge   = 36.dp
     val radiusFull     = 50.dp
 
-    // TopAppBar curve
-    val topBarCurve    = 28.dp
-
     // Icon Sizes
     val iconSmall      = 16.dp
     val iconMedium     = 24.dp

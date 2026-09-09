@@ -60,7 +60,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.bulkbasket.domain.model.Product
-import com.bulkbasket.ui.common.components.CurvedTopAppBar
 import com.bulkbasket.ui.theme.Dimensions
 
 @OptIn(ExperimentalMaterial3Api::class)

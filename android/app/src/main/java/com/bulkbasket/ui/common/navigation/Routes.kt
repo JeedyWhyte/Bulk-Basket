@@ -26,6 +26,16 @@ sealed class Routes(val route: String) {
         fun createRoute(orderId: String) = "buyer/tracking/$orderId"
     }
 
+    // Buyer — Account
+    data object EditProfile : Routes("buyer/account/edit-profile")
+    data object RatingsReviews : Routes("buyer/account/ratings")
+    data object PaymentSettings : Routes("buyer/account/payment")
+    data object AppSettings : Routes("buyer/account/settings")
+    data object NotificationPreferences : Routes("buyer/account/notification-preferences")
+    data object CloseAccount : Routes("buyer/account/close")
+    data object PrivacyPolicy : Routes("buyer/account/privacy")
+    data object HelpSupport : Routes("buyer/account/help")
+
     // Seller
     data object SellerDashboard : Routes("seller/dashboard")
     data object Inventory : Routes("seller/inventory")

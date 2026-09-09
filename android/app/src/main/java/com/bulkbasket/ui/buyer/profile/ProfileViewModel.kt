@@ -6,8 +6,6 @@ import com.bulkbasket.domain.model.Address
 import com.bulkbasket.domain.model.User
 import com.bulkbasket.domain.repository.IAuthRepository
 import com.bulkbasket.utils.NetworkResult
-import com.bulkbasket.ui.theme.ThemeMode
-import com.bulkbasket.ui.theme.ThemeViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +18,9 @@ data class ProfileState(
     val addresses: List<Address> = emptyList(),
     val error: String? = null,
     val isLoggedOut: Boolean = false,
+    val isSavingProfile: Boolean = false,
+    val saveProfileError: String? = null,
+    val profileSaved: Boolean = false,
 )
 
 @HiltViewModel
@@ -57,6 +58,36 @@ class ProfileViewModel @Inject constructor(
                 error = if (user == null) "Failed to load profile" else null,
             )
         }
+    }
+
+    fun updateProfile(username: String, email: String, phoneNumber: String) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(
+                isSavingProfile = true,
+                saveProfileError = null,
+                profileSaved = false,
+            )
+            when (val result = authRepository.updateProfile(username, email, phoneNumber)) {
+                is NetworkResult.Success -> {
+                    _state.value = _state.value.copy(
+                        isSavingProfile = false,
+                        user = result.data,
+                        profileSaved = true,
+                    )
+                }
+                is NetworkResult.Error -> {
+                    _state.value = _state.value.copy(
+                        isSavingProfile = false,
+                        saveProfileError = result.message,
+                    )
+                }
+                is NetworkResult.Loading -> {}
+            }
+        }
+    }
+
+    fun clearProfileSaved() {
+        _state.value = _state.value.copy(profileSaved = false)
     }
 
     fun logout() {

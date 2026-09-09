@@ -25,10 +25,12 @@ Complete reference for the BulkBasket REST API.
 8. [Order Endpoints](#-order-endpoints)
 9. [Delivery Endpoints](#-delivery-endpoints)
 10. [Notification Endpoints](#-notification-endpoints)
-11. [Webhook Endpoints](#-webhook-endpoints)
-12. [Rate Limiting](#-rate-limiting)
-13. [Pagination](#-pagination)
-14. [Filtering & Sorting](#-filtering--sorting)
+11. [Review Endpoints](#-review-endpoints)
+12. [Payment Endpoints](#-payment-endpoints)
+13. [Webhook Endpoints](#-webhook-endpoints)
+14. [Rate Limiting](#-rate-limiting)
+15. [Pagination](#-pagination)
+16. [Filtering & Sorting](#-filtering--sorting)
 
 ---
 
@@ -381,6 +383,24 @@ Field names are `latitude`/`longitude`, not `lat`/`lng`. There is no `country` f
 ---
 
 Removing a delivery address is **not currently supported** by the API — there is no `DELETE` route for an individual address (the `addresses/` URL only wires up list + create).
+
+---
+
+### POST `/users/close-account/`
+
+Deactivate (soft-delete) the caller's own account. Sets `is_active=False` — the account can no longer authenticate, but rows referencing it (orders, reviews) are kept for the other party's history. This is the only self-service account closure available; permanent data erasure is a manual support request, not an API endpoint.
+
+**Authentication:** Required
+**Response shape:** `status`/`message` envelope
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "message": "Your account has been deactivated."
+}
+```
 
 ---
 
@@ -1179,6 +1199,199 @@ Mark all of the user's notifications as read.
   "message": "All notifications marked as read."
 }
 ```
+
+---
+
+## ⭐ Review Endpoints
+
+### GET `/reviews/`
+
+List the authenticated buyer's own reviews.
+
+**Authentication:** Required (buyer)
+**Response shape:** Paginated (`count`/`next`/`previous`/`results`)
+
+```json
+{
+  "count": 1,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "id": 5,
+      "order_id": "9d3f7b1e-...-uuid",
+      "seller": 12,
+      "seller_name": "Eze Bulk Traders",
+      "rating": 5,
+      "comment": "Great quality and fast prep.",
+      "created_at": "2026-06-16T09:00:00Z"
+    }
+  ]
+}
+```
+
+---
+
+### POST `/reviews/`
+
+Rate the seller for one of the caller's own **delivered** orders. One review per order — a second attempt on the same order is rejected.
+
+**Authentication:** Required (buyer)
+**Response shape:** `status`/`message`/`data` envelope
+
+**Request Body:**
+
+```json
+{
+  "order_id": "9d3f7b1e-...-uuid",
+  "rating": 5,
+  "comment": "Great quality and fast prep."
+}
+```
+
+`rating` must be an integer 1–5. `comment` is optional.
+
+**Success Response (201):** Review object (same shape as the list above) under `data`.
+
+**Error Response (400):** e.g. `{"status": "error", "message": "You can only review an order after it has been delivered."}`
+
+Submitting a review recalculates the seller's `rating`/`total_ratings` on `sellers_sellerprofile` from all of their reviews — there is no separate background job for this.
+
+---
+
+### GET `/reviews/seller/`
+
+List the reviews the authenticated seller has received.
+
+**Authentication:** Required (seller)
+**Response shape:** Paginated (`count`/`next`/`previous`/`results`), same item shape as `GET /reviews/`.
+
+---
+
+## 💳 Payment Endpoints
+
+These endpoints back a **demo payment gateway** — built for this academic project to demonstrate a checkout payment integration without a live third-party processor account. No real card data is ever transmitted, stored, or charged. Card numbers are validated with a Luhn checksum and the well-known test PAN `4000000000000002` always declines (mirroring the test-card convention used by real sandboxes like Stripe's).
+
+### GET `/payments/methods/`
+
+List the authenticated user's saved demo cards.
+
+**Authentication:** Required
+**Response shape:** Paginated (`count`/`next`/`previous`/`results`)
+
+```json
+{
+  "count": 1,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "id": 3,
+      "brand": "visa",
+      "last4": "4242",
+      "expiry_month": 12,
+      "expiry_year": 2030,
+      "is_default": true
+    }
+  ]
+}
+```
+
+Only the brand and last 4 digits are ever stored — never a full PAN.
+
+---
+
+### POST `/payments/methods/`
+
+Save a demo card for reuse. The first card saved becomes the default.
+
+**Authentication:** Required
+
+**Request Body:**
+
+```json
+{
+  "brand": "visa",
+  "last4": "4242",
+  "expiry_month": 12,
+  "expiry_year": 2030
+}
+```
+
+**Success Response (201):** Created payment method object, unwrapped.
+
+---
+
+### DELETE `/payments/methods/<id>/`
+
+Remove one of the caller's own saved demo cards.
+
+**Authentication:** Required
+
+**Success Response (204):** No content.
+
+---
+
+### POST `/payments/charge/`
+
+Run the demo gateway against one of the caller's own orders. An order can only be charged once.
+
+**Authentication:** Required (buyer)
+**Response shape:** `status`/`message`/`data` envelope
+
+**Request Body (Cash on Delivery):**
+
+```json
+{
+  "order_id": "9d3f7b1e-...-uuid",
+  "method": "cash_on_delivery"
+}
+```
+
+**Request Body (Demo Card):**
+
+```json
+{
+  "order_id": "9d3f7b1e-...-uuid",
+  "method": "demo_card",
+  "card_number": "4242424242424242",
+  "expiry_month": 12,
+  "expiry_year": 2030,
+  "cvv": "123",
+  "save_card": true
+}
+```
+
+**Success Response (201) — authorized:**
+
+```json
+{
+  "status": "success",
+  "message": "Payment authorized.",
+  "data": {
+    "id": "b1c2...-uuid",
+    "order": "9d3f7b1e-...-uuid",
+    "method": "demo_card",
+    "status": "authorized",
+    "amount": "5500.00",
+    "reference": "DEMO-AB12CD34EF56",
+    "failure_reason": "",
+    "created_at": "2026-06-16T09:05:00Z"
+  }
+}
+```
+
+**Error Response (402) — declined:**
+
+```json
+{
+  "status": "error",
+  "message": "The card was declined by the issuing bank.",
+  "data": { "...": "same Payment shape, status: \"declined\"" }
+}
+```
+
+`cash_on_delivery` always authorizes. A `Payment` row is created either way, so every charge attempt — successful or declined — has a persisted audit trail.
 
 ---
 

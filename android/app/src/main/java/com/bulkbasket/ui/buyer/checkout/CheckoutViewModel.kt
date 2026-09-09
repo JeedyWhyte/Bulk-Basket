@@ -7,6 +7,7 @@ import com.bulkbasket.data.remote.dto.OrderItemRequest
 import com.bulkbasket.domain.model.Address
 import com.bulkbasket.domain.repository.IAuthRepository
 import com.bulkbasket.domain.repository.IOrderRepository
+import com.bulkbasket.domain.repository.IPaymentRepository
 import com.bulkbasket.ui.buyer.cart.CartViewModel
 import com.bulkbasket.utils.NetworkResult
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -14,6 +15,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+const val PAYMENT_METHOD_CASH = "cash_on_delivery"
+const val PAYMENT_METHOD_DEMO_CARD = "demo_card"
 
 data class CheckoutState(
     val isLoadingAddresses: Boolean = false,
@@ -25,12 +29,21 @@ data class CheckoutState(
     val orderId: String? = null,
     val showAddAddressDialog: Boolean = false,
     val isSavingAddress: Boolean = false,
+    val paymentMethod: String = PAYMENT_METHOD_CASH,
+    val showCardDialog: Boolean = false,
+    val cardNumber: String = "",
+    val cardExpiryMonth: Int? = null,
+    val cardExpiryYear: Int? = null,
+    val cardCvv: String = "",
+    val paymentReference: String? = null,
+    val paymentDeclineMessage: String? = null,
 )
 
 @HiltViewModel
 class CheckoutViewModel @Inject constructor(
     private val orderRepository: IOrderRepository,
     private val authRepository: IAuthRepository,
+    private val paymentRepository: IPaymentRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(CheckoutState())
@@ -120,6 +133,38 @@ class CheckoutViewModel @Inject constructor(
         }
     }
 
+    fun selectPaymentMethod(method: String) {
+        _state.value = _state.value.copy(paymentMethod = method)
+        if (method == PAYMENT_METHOD_DEMO_CARD && _state.value.cardNumber.isBlank()) {
+            showCardDialog()
+        }
+    }
+
+    fun showCardDialog() {
+        _state.value = _state.value.copy(showCardDialog = true)
+    }
+
+    fun hideCardDialog() {
+        _state.value = _state.value.copy(showCardDialog = false)
+    }
+
+    fun saveCardDetails(number: String, month: Int, year: Int, cvv: String) {
+        _state.value = _state.value.copy(
+            cardNumber = number,
+            cardExpiryMonth = month,
+            cardExpiryYear = year,
+            cardCvv = cvv,
+            showCardDialog = false,
+        )
+    }
+
+    fun acknowledgeDecline() {
+        _state.value = _state.value.copy(
+            paymentDeclineMessage = null,
+            orderPlaced = true,
+        )
+    }
+
     fun placeOrder(cartViewModel: CartViewModel) {
         val cartState = cartViewModel.state.value
         val selectedAddressId = _state.value.selectedAddressId
@@ -135,6 +180,15 @@ class CheckoutViewModel @Inject constructor(
             _state.value = _state.value.copy(
                 error = "Your cart is empty."
             )
+            return
+        }
+        if (_state.value.paymentMethod == PAYMENT_METHOD_DEMO_CARD &&
+            _state.value.cardNumber.isBlank()
+        ) {
+            _state.value = _state.value.copy(
+                error = "Please enter your demo card details."
+            )
+            showCardDialog()
             return
         }
 
@@ -158,11 +212,41 @@ class CheckoutViewModel @Inject constructor(
             when (val result = orderRepository.createOrder(request)) {
                 is NetworkResult.Success -> {
                     cartViewModel.clearCart()
-                    _state.value = _state.value.copy(
-                        isPlacingOrder = false,
-                        orderPlaced = true,
-                        orderId = result.data.id,
-                    )
+                    val order = result.data
+
+                    if (_state.value.paymentMethod == PAYMENT_METHOD_DEMO_CARD) {
+                        when (val chargeResult = paymentRepository.chargeOrder(
+                            orderId = order.id,
+                            method = PAYMENT_METHOD_DEMO_CARD,
+                            cardNumber = _state.value.cardNumber,
+                            expiryMonth = _state.value.cardExpiryMonth,
+                            expiryYear = _state.value.cardExpiryYear,
+                            cvv = _state.value.cardCvv,
+                        )) {
+                            is NetworkResult.Success -> {
+                                _state.value = _state.value.copy(
+                                    isPlacingOrder = false,
+                                    orderPlaced = true,
+                                    orderId = order.id,
+                                    paymentReference = chargeResult.data.reference,
+                                )
+                            }
+                            is NetworkResult.Error -> {
+                                _state.value = _state.value.copy(
+                                    isPlacingOrder = false,
+                                    orderId = order.id,
+                                    paymentDeclineMessage = chargeResult.message,
+                                )
+                            }
+                            is NetworkResult.Loading -> {}
+                        }
+                    } else {
+                        _state.value = _state.value.copy(
+                            isPlacingOrder = false,
+                            orderPlaced = true,
+                            orderId = order.id,
+                        )
+                    }
                 }
                 is NetworkResult.Error -> {
                     _state.value = _state.value.copy(

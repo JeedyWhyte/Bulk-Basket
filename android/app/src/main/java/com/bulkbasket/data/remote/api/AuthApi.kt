@@ -41,4 +41,7 @@ interface AuthApi {
 
     @POST("users/fcm-token/")
     suspend fun updateFcmToken(@Body request: FcmTokenRequest): Response<ApiResponse<Unit>>
+
+    @POST("users/close-account/")
+    suspend fun closeAccount(): Response<ApiResponse<Unit>>
 }

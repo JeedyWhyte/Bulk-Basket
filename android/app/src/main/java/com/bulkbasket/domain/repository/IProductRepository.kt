@@ -14,6 +14,7 @@ interface IProductRepository {
         minPrice: Double? = null,
         maxPrice: Double? = null,
         page: Int = 1,
+        pageSize: Int? = null,
     ): NetworkResult<List<Product>>
 
     suspend fun getProduct(id: Int): NetworkResult<Product>

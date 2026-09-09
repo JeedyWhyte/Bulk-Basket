@@ -105,6 +105,7 @@ class HomeViewModel @Inject constructor(
             _state.value = _state.value.copy(isLoadingProducts = true)
             when (val result = productRepository.getProducts(
                 page = 1,
+                pageSize = 100,
             )) {
                 is NetworkResult.Success -> {
                     _state.value = _state.value.copy(

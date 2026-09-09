@@ -1,5 +1,7 @@
 package com.bulkbasket.ui.seller
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -31,24 +33,30 @@ fun SellerShellScreen(
             )
         },
     ) { innerPadding ->
-        when (activeTab) {
-            SellerTab.Dashboard -> SellerDashboardScreen(
-                onNotificationsClick = onNavigateToNotifications,
-                onOrdersClick = { activeTab = SellerTab.Orders },
-                modifier = Modifier.padding(innerPadding),
-            )
-            SellerTab.Orders -> SellerOrdersScreen(
-                modifier = Modifier.padding(innerPadding),
-            )
-            SellerTab.Inventory -> InventoryScreen(
-                onBack = { activeTab = SellerTab.Dashboard },
-                modifier = Modifier.padding(innerPadding),
-            )
-            SellerTab.Profile -> SellerProfileScreen(
-                onBack = { activeTab = SellerTab.Dashboard },
-                onLogout = onLogout,
-                modifier = Modifier.padding(innerPadding),
-            )
+        Crossfade(
+            targetState = activeTab,
+            label = "seller_tab",
+            animationSpec = tween(durationMillis = 200),
+        ) { tab ->
+            when (tab) {
+                SellerTab.Dashboard -> SellerDashboardScreen(
+                    onNotificationsClick = onNavigateToNotifications,
+                    onOrdersClick = { activeTab = SellerTab.Orders },
+                    modifier = Modifier.padding(innerPadding),
+                )
+                SellerTab.Orders -> SellerOrdersScreen(
+                    modifier = Modifier.padding(innerPadding),
+                )
+                SellerTab.Inventory -> InventoryScreen(
+                    onBack = { activeTab = SellerTab.Dashboard },
+                    modifier = Modifier.padding(innerPadding),
+                )
+                SellerTab.Profile -> SellerProfileScreen(
+                    onBack = { activeTab = SellerTab.Dashboard },
+                    onLogout = onLogout,
+                    modifier = Modifier.padding(innerPadding),
+                )
+            }
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.bulkbasket.utils
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -22,6 +23,9 @@ class PreferencesManager @Inject constructor(
         val USER_ID = stringPreferencesKey("user_id")
         val USERNAME = stringPreferencesKey("username")
         val THEME_MODE = stringPreferencesKey("theme_mode")
+        val NOTIFY_ORDER_UPDATES = booleanPreferencesKey("notify_order_updates")
+        val NOTIFY_PROMOTIONS = booleanPreferencesKey("notify_promotions")
+        val NOTIFY_NEW_ARRIVALS = booleanPreferencesKey("notify_new_arrivals")
     }
 
     val accessToken: Flow<String> = context.dataStore.data
@@ -61,5 +65,22 @@ class PreferencesManager @Inject constructor(
 
     suspend fun saveThemeMode(mode: String) {
         context.dataStore.edit { it[THEME_MODE] = mode }
+    }
+
+    val notifyOrderUpdates: Flow<Boolean> = context.dataStore.data
+        .map { it[NOTIFY_ORDER_UPDATES] ?: true }
+    val notifyPromotions: Flow<Boolean> = context.dataStore.data
+        .map { it[NOTIFY_PROMOTIONS] ?: true }
+    val notifyNewArrivals: Flow<Boolean> = context.dataStore.data
+        .map { it[NOTIFY_NEW_ARRIVALS] ?: true }
+
+    suspend fun setNotifyOrderUpdates(enabled: Boolean) {
+        context.dataStore.edit { it[NOTIFY_ORDER_UPDATES] = enabled }
+    }
+    suspend fun setNotifyPromotions(enabled: Boolean) {
+        context.dataStore.edit { it[NOTIFY_PROMOTIONS] = enabled }
+    }
+    suspend fun setNotifyNewArrivals(enabled: Boolean) {
+        context.dataStore.edit { it[NOTIFY_NEW_ARRIVALS] = enabled }
     }
 }

@@ -8,7 +8,9 @@ import com.bulkbasket.data.remote.api.AuthApi
 import com.bulkbasket.data.remote.api.DeliveryApi
 import com.bulkbasket.data.remote.api.NotificationsApi
 import com.bulkbasket.data.remote.api.OrdersApi
+import com.bulkbasket.data.remote.api.PaymentsApi
 import com.bulkbasket.data.remote.api.ProductsApi
+import com.bulkbasket.data.remote.api.ReviewsApi
 import com.bulkbasket.data.remote.api.SellersApi
 import dagger.Module
 import dagger.Provides
@@ -96,5 +98,17 @@ object NetworkModule {
     @Singleton
     fun provideDeliveryApi(retrofit: Retrofit): DeliveryApi {
         return retrofit.create(DeliveryApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideReviewsApi(retrofit: Retrofit): ReviewsApi {
+        return retrofit.create(ReviewsApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun providePaymentsApi(retrofit: Retrofit): PaymentsApi {
+        return retrofit.create(PaymentsApi::class.java)
     }
 }

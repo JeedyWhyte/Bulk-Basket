@@ -110,6 +110,32 @@ class AuthRepository @Inject constructor(
         }
     }
 
+    override suspend fun updateProfile(
+        username: String,
+        email: String,
+        phoneNumber: String,
+    ): NetworkResult<User> {
+        return try {
+            val response = api.updateProfile(
+                mapOf(
+                    "username" to username,
+                    "email" to email,
+                    "phone_number" to phoneNumber,
+                )
+            )
+            if (response.isSuccessful) {
+                NetworkResult.Success(response.body()!!.toUser())
+            } else {
+                NetworkResult.Error(
+                    response.errorMessage("Failed to update profile"),
+                    response.code(),
+                )
+            }
+        } catch (e: Exception) {
+            NetworkResult.Error(e.message ?: "Network error")
+        }
+    }
+
     override suspend fun getAddresses(): NetworkResult<List<Address>> {
         return try {
             val response = api.getAddresses()
@@ -178,6 +204,23 @@ class AuthRepository @Inject constructor(
 
     override suspend fun logout() {
         prefs.clear()
+    }
+
+    override suspend fun closeAccount(): NetworkResult<Unit> {
+        return try {
+            val response = api.closeAccount()
+            if (response.isSuccessful) {
+                prefs.clear()
+                NetworkResult.Success(Unit)
+            } else {
+                NetworkResult.Error(
+                    response.errorMessage("Failed to close account"),
+                    response.code(),
+                )
+            }
+        } catch (e: Exception) {
+            NetworkResult.Error(e.message ?: "Network error")
+        }
     }
 
     /**

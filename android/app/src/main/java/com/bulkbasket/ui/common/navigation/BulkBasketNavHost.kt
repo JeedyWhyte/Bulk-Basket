@@ -1,5 +1,8 @@
 package com.bulkbasket.ui.common.navigation
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
@@ -15,6 +18,15 @@ import com.bulkbasket.ui.buyer.cart.CartScreen
 import com.bulkbasket.ui.buyer.checkout.CheckoutScreen
 import com.bulkbasket.ui.buyer.orders.BuyerOrdersScreen
 import com.bulkbasket.ui.buyer.profile.ProfileScreen
+import com.bulkbasket.ui.buyer.profile.ProfileViewModel
+import com.bulkbasket.ui.buyer.profile.EditProfileScreen
+import com.bulkbasket.ui.buyer.profile.RatingsReviewsScreen
+import com.bulkbasket.ui.buyer.profile.PaymentSettingsScreen
+import com.bulkbasket.ui.buyer.profile.AppSettingsScreen
+import com.bulkbasket.ui.buyer.profile.NotificationPreferencesScreen
+import com.bulkbasket.ui.buyer.profile.CloseAccountScreen
+import com.bulkbasket.ui.buyer.profile.PrivacyPolicyScreen
+import com.bulkbasket.ui.buyer.profile.HelpSupportScreen
 import com.bulkbasket.ui.buyer.BuyerShellScreen
 import com.bulkbasket.ui.seller.SellerShellScreen
 import com.bulkbasket.ui.seller.inventory.InventoryScreen
@@ -53,6 +65,22 @@ private fun buyerGraphCartViewModel(
     return hiltViewModel(parentEntry)
 }
 
+/**
+ * Resolves the buyer graph's back-stack entry so the Account tab and every
+ * Account sub-page (Edit Profile, etc.) share one [ProfileViewModel] —
+ * saving a profile edit is reflected immediately when navigating back.
+ */
+@Composable
+private fun buyerGraphProfileViewModel(
+    navController: NavHostController,
+    entry: NavBackStackEntry,
+): ProfileViewModel {
+    val parentEntry = remember(entry) {
+        navController.getBackStackEntry(BUYER_GRAPH_ROUTE)
+    }
+    return hiltViewModel(parentEntry)
+}
+
 @Composable
 fun BulkBasketNavHost(
     navController: NavHostController,
@@ -62,6 +90,10 @@ fun BulkBasketNavHost(
         navController = navController,
         startDestination = Routes.Splash.route,
         modifier = modifier,
+        enterTransition = { fadeIn(animationSpec = tween(220)) },
+        exitTransition = { fadeOut(animationSpec = tween(220)) },
+        popEnterTransition = { fadeIn(animationSpec = tween(220)) },
+        popExitTransition = { fadeOut(animationSpec = tween(220)) },
     ) {
         // Splash
         composable(Routes.Splash.route) {
@@ -129,6 +161,7 @@ fun BulkBasketNavHost(
         ) {
             composable(Routes.BuyerHome.route) {
                 val cartViewModel: CartViewModel = hiltViewModel(it)
+                val profileViewModel = buyerGraphProfileViewModel(navController, it)
                 BuyerShellScreen(
                     onNavigateToSeller = { sellerId ->
                         navController.navigate(Routes.SellerDetail.createRoute(sellerId))
@@ -148,12 +181,37 @@ fun BulkBasketNavHost(
                     onNavigateToOrders = {
                         navController.navigate(Routes.BuyerOrders.route)
                     },
+                    onNavigateToEditProfile = {
+                        navController.navigate(Routes.EditProfile.route)
+                    },
+                    onNavigateToRatings = {
+                        navController.navigate(Routes.RatingsReviews.route)
+                    },
+                    onNavigateToPaymentSettings = {
+                        navController.navigate(Routes.PaymentSettings.route)
+                    },
+                    onNavigateToAppSettings = {
+                        navController.navigate(Routes.AppSettings.route)
+                    },
+                    onNavigateToNotificationPreferences = {
+                        navController.navigate(Routes.NotificationPreferences.route)
+                    },
+                    onNavigateToCloseAccount = {
+                        navController.navigate(Routes.CloseAccount.route)
+                    },
+                    onNavigateToPrivacyPolicy = {
+                        navController.navigate(Routes.PrivacyPolicy.route)
+                    },
+                    onNavigateToHelpSupport = {
+                        navController.navigate(Routes.HelpSupport.route)
+                    },
                     onLogout = {
                         navController.navigate(Routes.Login.route) {
                             popUpTo(0) { inclusive = true }
                         }
                     },
                     cartViewModel = cartViewModel,
+                    profileViewModel = profileViewModel,
                 )
             }
 
@@ -225,6 +283,65 @@ fun BulkBasketNavHost(
 
             composable(Routes.BuyerOrders.route) {
                 BuyerOrdersScreen(
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            composable(Routes.EditProfile.route) {
+                val profileViewModel = buyerGraphProfileViewModel(navController, it)
+
+                EditProfileScreen(
+                    onBack = { navController.popBackStack() },
+                    viewModel = profileViewModel,
+                )
+            }
+
+            composable(Routes.RatingsReviews.route) {
+                RatingsReviewsScreen(
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            composable(Routes.PaymentSettings.route) {
+                PaymentSettingsScreen(
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            composable(Routes.AppSettings.route) {
+                AppSettingsScreen(
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            composable(Routes.NotificationPreferences.route) {
+                NotificationPreferencesScreen(
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            composable(Routes.CloseAccount.route) {
+                CloseAccountScreen(
+                    onBack = { navController.popBackStack() },
+                    onNavigateToHelp = {
+                        navController.navigate(Routes.HelpSupport.route)
+                    },
+                    onAccountClosed = {
+                        navController.navigate(Routes.Login.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    },
+                )
+            }
+
+            composable(Routes.PrivacyPolicy.route) {
+                PrivacyPolicyScreen(
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            composable(Routes.HelpSupport.route) {
+                HelpSupportScreen(
                     onBack = { navController.popBackStack() },
                 )
             }

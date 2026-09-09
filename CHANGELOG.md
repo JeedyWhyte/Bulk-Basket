@@ -36,10 +36,17 @@ For academic milestones, we use suffixes:
 - `orders.0002_orderitem_product_protect` migration — deleting a product referenced by past orders is now rejected instead of cascading
 - A global DRF exception handler that turns a blocked deletion (`ProtectedError`) into a clean 400 response
 - Backend test coverage for order creation, delivery status transitions, product visibility, and the new exception handler
+- `apps.reviews` backend app — buyers can rate a seller on a delivered order (`GET`/`POST /reviews/`, `GET /reviews/seller/`); submitting a review recalculates the seller's aggregate `rating`/`total_ratings`
+- `apps.payments` backend app — a **demo** payment gateway (`GET`/`POST /payments/methods/`, `DELETE /payments/methods/<id>/`, `POST /payments/charge/`) that Luhn-validates a demo card, declines the well-known test PAN `4000000000000002`, and always authorizes Cash on Delivery; no real card data is ever stored or transmitted
+- `POST /users/close-account/` — self-service account deactivation (soft delete via `is_active=False`)
+- Android: Ratings & Reviews screen now shows real reviews, and delivered orders in My Orders get a "Rate Seller" action
+- Android: Checkout now has a Payment Method step (Cash on Delivery or a demo card), Payment Settings manages saved demo cards, and Close Account performs a real (confirmed) deactivation instead of only linking to support
+- Crossfade transitions between buyer/seller bottom-nav tabs, and fade transitions between navigation destinations app-wide
 
 ### Changed
 - `create_order()` now locks all line-item products in a single query instead of one per item
 - Android login no longer waits on FCM token registration before completing
+- Screens that used the green `CurvedTopAppBar` (Rider Profile, Seller Detail, Checkout, Rider Jobs, Notifications, My Orders) now use the same flat, background-matching header as the rest of the app, so their top bar no longer clashes with the bottom navigation bar's color
 
 ### Deprecated
 - N/A
@@ -47,6 +54,7 @@ For academic milestones, we use suffixes:
 ### Removed
 - Unused Celery task for order-status notifications, superseded by the synchronous notification call already used in `orders/views.py`
 - Empty Django test stub files (`orders/tests.py`, `products/tests.py`, `users/tests.py`) that the test runner never collected, replaced by real `tests/` packages with actual coverage
+- `CurvedTopAppBar` composable and the `Dimensions.topBarCurve` token it was the only user of, now that every screen shares one flat header style
 
 ### Fixed
 - Android `BASE_URL` no longer points at a developer's local network address
@@ -55,6 +63,7 @@ For academic milestones, we use suffixes:
 - A delivery that fails before pickup no longer permanently strands its order — it's now reclaimable by another rider
 - Delivery and order status updates are now applied atomically
 - A seller can now open their own soft-deleted product for editing instead of getting a 404
+- My Orders screen had no back button at all in its header — it's now consistent with every other screen
 
 ### Security
 - Deleting a product still referenced by past orders is now rejected at the application level (`PROTECT` + a custom exception handler) instead of cascading or raising an unhandled 500

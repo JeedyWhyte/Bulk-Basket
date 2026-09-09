@@ -50,15 +50,7 @@ import com.bulkbasket.domain.model.Seller
 import com.bulkbasket.ui.common.components.HomeLoadingScreen
 import com.bulkbasket.ui.buyer.cart.CartViewModel
 import com.bulkbasket.ui.buyer.common.ProductCard
-import com.bulkbasket.ui.theme.Accent500
 import com.bulkbasket.ui.theme.Dimensions
-import com.bulkbasket.ui.theme.Gray100
-import com.bulkbasket.ui.theme.Primary50
-import com.bulkbasket.ui.theme.Primary700
-import com.bulkbasket.ui.theme.SuccessDark
-import com.bulkbasket.ui.theme.SuccessLight
-import com.bulkbasket.ui.theme.TextPrimary
-import com.bulkbasket.ui.theme.TextTertiary
 import java.util.Calendar
 
 private fun getGreeting(): String {
@@ -386,13 +378,13 @@ private fun SellerCard(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Primary50),
+                        .background(MaterialTheme.colorScheme.primaryContainer),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Store,
                         contentDescription = null,
-                        tint = Primary700,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.size(20.dp),
                     )
                 }
@@ -429,7 +421,7 @@ private fun SellerCard(
                     Icon(
                         imageVector = Icons.Filled.Star,
                         contentDescription = null,
-                        tint = Accent500,
+                        tint = MaterialTheme.colorScheme.secondary,
                         modifier = Modifier.size(12.dp),
                     )
                     Text(
@@ -443,7 +435,10 @@ private fun SellerCard(
                     modifier = Modifier
                         .clip(RoundedCornerShape(4.dp))
                         .background(
-                            if (seller.isOpen) SuccessLight else Gray100
+                            if (seller.isOpen)
+                                MaterialTheme.colorScheme.primaryContainer
+                            else
+                                MaterialTheme.colorScheme.surfaceVariant
                         )
                         .padding(horizontal = 8.dp, vertical = 3.dp),
                 ) {
@@ -451,7 +446,10 @@ private fun SellerCard(
                         text = if (seller.isOpen) "Open" else "Closed",
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Medium,
-                        color = if (seller.isOpen) SuccessDark else TextTertiary,
+                        color = if (seller.isOpen)
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }

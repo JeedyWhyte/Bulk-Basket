@@ -26,6 +26,7 @@ class ProductRepository @Inject constructor(
         minPrice: Double?,
         maxPrice: Double?,
         page: Int,
+        pageSize: Int?,
     ): NetworkResult<List<Product>> {
         return try {
             val response = productsApi.getProducts(
@@ -34,6 +35,7 @@ class ProductRepository @Inject constructor(
                 minPrice = minPrice,
                 maxPrice = maxPrice,
                 page = page,
+                pageSize = pageSize,
             )
             if (response.isSuccessful) {
                 NetworkResult.Success(
