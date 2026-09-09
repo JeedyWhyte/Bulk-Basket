@@ -284,7 +284,7 @@ fun ActiveDeliveryScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(Dimensions.buttonHeight),
-                                    shape = RoundedCornerShape(Dimensions.radiusMedium),
+                                    shape = RoundedCornerShape(Dimensions.radiusFull),
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = MaterialTheme.colorScheme.primary,
                                     ),
@@ -305,7 +305,7 @@ fun ActiveDeliveryScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(Dimensions.buttonHeight),
-                                    shape = RoundedCornerShape(Dimensions.radiusMedium),
+                                    shape = RoundedCornerShape(Dimensions.radiusFull),
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = MaterialTheme.colorScheme.primary,
                                     ),

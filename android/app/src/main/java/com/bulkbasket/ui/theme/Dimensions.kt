@@ -10,11 +10,15 @@ object Dimensions {
     val paddingLarge   = 24.dp
     val paddingXLarge  = 32.dp
 
-    // Corner Radius
-    val radiusSmall    = 8.dp
-    val radiusMedium   = 12.dp
-    val radiusLarge    = 16.dp
+    // Corner Radius — modernised
+    val radiusSmall    = 12.dp
+    val radiusMedium   = 20.dp
+    val radiusLarge    = 28.dp
+    val radiusXLarge   = 36.dp
     val radiusFull     = 50.dp
+
+    // TopAppBar curve
+    val topBarCurve    = 28.dp
 
     // Icon Sizes
     val iconSmall      = 16.dp
@@ -22,11 +26,12 @@ object Dimensions {
     val iconLarge      = 32.dp
 
     // Component Heights
-    val buttonHeight   = 52.dp
-    val inputHeight    = 56.dp
-    val appBarHeight   = 64.dp
+    val buttonHeight   = 56.dp
+    val inputHeight    = 60.dp
+    val appBarHeight   = 72.dp
     val bottomBarHeight = 60.dp
 
     // Card
-    val cardElevation  = 2.dp
+    val cardElevation  = 0.dp       // use border instead
+    val cardBorderWidth = 1.dp
 }

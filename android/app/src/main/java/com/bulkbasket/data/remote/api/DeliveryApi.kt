@@ -1,8 +1,10 @@
 package com.bulkbasket.data.remote.api
 
+import com.bulkbasket.data.remote.dto.ApiResponse
 import com.bulkbasket.data.remote.dto.DeliveryDto
 import com.bulkbasket.data.remote.dto.DeliveryStatusRequest
 import com.bulkbasket.data.remote.dto.LocationUpdateRequest
+import com.bulkbasket.data.remote.dto.PaginatedResponse
 import com.bulkbasket.data.remote.dto.RiderProfileDto
 import com.bulkbasket.data.remote.dto.RiderProfileRequest
 import retrofit2.Response
@@ -15,19 +17,19 @@ import retrofit2.http.Path
 
 interface DeliveryApi {
     @GET("delivery/available/")
-    suspend fun getAvailableDeliveries(): Response<List<DeliveryDto>>
+    suspend fun getAvailableDeliveries(): Response<PaginatedResponse<DeliveryDto>>
 
     @GET("delivery/active/")
-    suspend fun getActiveDeliveries(): Response<List<DeliveryDto>>
+    suspend fun getActiveDeliveries(): Response<PaginatedResponse<DeliveryDto>>
 
     @POST("delivery/{id}/accept/")
-    suspend fun acceptDelivery(@Path("id") id: Int): Response<DeliveryDto>
+    suspend fun acceptDelivery(@Path("id") id: Int): Response<ApiResponse<DeliveryDto>>
 
     @PATCH("delivery/{id}/status/")
     suspend fun updateDeliveryStatus(
         @Path("id") id: Int,
         @Body request: DeliveryStatusRequest,
-    ): Response<DeliveryDto>
+    ): Response<ApiResponse<DeliveryDto>>
 
     @PATCH("delivery/location/")
     suspend fun updateLocation(
@@ -37,7 +39,7 @@ interface DeliveryApi {
     @POST("delivery/profile/")
     suspend fun createRiderProfile(
         @Body request: RiderProfileRequest,
-    ): Response<RiderProfileDto>
+    ): Response<ApiResponse<RiderProfileDto>>
 
     @GET("delivery/profile/me/")
     suspend fun getRiderProfile(): Response<RiderProfileDto>

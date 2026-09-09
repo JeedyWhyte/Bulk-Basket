@@ -1,5 +1,6 @@
 package com.bulkbasket.data.remote.api
 
+import com.bulkbasket.data.remote.dto.ApiResponse
 import com.bulkbasket.data.remote.dto.SellerProfileCreateRequest
 import com.bulkbasket.data.remote.dto.SellerProfileDto
 import retrofit2.Response
@@ -16,7 +17,7 @@ interface SellersApi {
         @Query("lat") lat: Double,
         @Query("lng") lng: Double,
         @Query("radius") radius: Double = 10.0,
-    ): Response<List<SellerProfileDto>>
+    ): Response<ApiResponse<List<SellerProfileDto>>>
 
     @GET("sellers/{id}/")
     suspend fun getSellerDetail(
@@ -26,7 +27,7 @@ interface SellersApi {
     @POST("sellers/profile/")
     suspend fun createSellerProfile(
         @Body request: SellerProfileCreateRequest
-    ): Response<SellerProfileDto>
+    ): Response<ApiResponse<SellerProfileDto>>
 
     @PUT("sellers/profile/me/")
     suspend fun updateSellerProfile(

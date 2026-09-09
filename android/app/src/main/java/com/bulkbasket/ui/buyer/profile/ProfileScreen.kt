@@ -1,10 +1,10 @@
 package com.bulkbasket.ui.buyer.profile
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,34 +12,35 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Help
+import androidx.compose.material.icons.filled.Inbox
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Payment
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Policy
+import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -50,29 +51,25 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.bulkbasket.ui.theme.Dimensions
-import com.bulkbasket.ui.theme.Green50
-import com.bulkbasket.ui.theme.Green600
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.SettingsBrightness
-import androidx.compose.material3.Surface
 import com.bulkbasket.ui.theme.ThemeMode
 import com.bulkbasket.ui.theme.ThemeViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     onBack: () -> Unit,
     onLogout: () -> Unit,
+    onOrdersClick: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: ProfileViewModel = hiltViewModel(),
     themeViewModel: ThemeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+    val themeMode by themeViewModel.themeMode.collectAsState()
     var showLogoutDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.isLoggedOut) {
@@ -83,13 +80,10 @@ fun ProfileScreen(
         AlertDialog(
             onDismissRequest = { showLogoutDialog = false },
             title = {
-                Text(
-                    text = "Log Out",
-                    fontWeight = FontWeight.Bold,
-                )
+                Text("Sign Out", fontWeight = FontWeight.Bold)
             },
             text = {
-                Text("Are you sure you want to log out?")
+                Text("Are you sure you want to sign out?")
             },
             confirmButton = {
                 Button(
@@ -100,494 +94,441 @@ fun ProfileScreen(
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error,
                     ),
-                ) {
-                    Text("Log Out")
-                }
+                ) { Text("Sign Out") }
             },
             dismissButton = {
                 TextButton(onClick = { showLogoutDialog = false }) {
                     Text("Cancel")
                 }
             },
+            shape = RoundedCornerShape(Dimensions.radiusMedium),
         )
     }
 
     Scaffold(
+        modifier = modifier,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "My Profile",
-                        fontWeight = FontWeight.Bold,
-                    )
-                },
-                actions = {
-                    IconButton(onClick = { showLogoutDialog = true }) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Logout,
-                            contentDescription = "Log Out",
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
-            )
+            // Matches background — same as BottomNav theme
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.background)
+                    .statusBarsPadding()
+                    .padding(
+                        horizontal = Dimensions.paddingLarge,
+                        vertical = 4.dp,
+                    ),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Account",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+            }
         },
     ) { innerPadding ->
 
-        PullToRefreshBox(
-            isRefreshing = state.isLoading,
-            onRefresh = { viewModel.loadProfile() },
-            modifier = modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-        ) {
-            when {
-                state.isLoading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        CircularProgressIndicator()
-                    }
+        when {
+            state.isLoading -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
+            }
 
-                state.user != null -> {
-                    val user = state.user!!
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(
-                            bottom = Dimensions.paddingLarge
+            else -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+
+                    // ── Profile Header ────────────────────────────
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                horizontal = Dimensions.paddingLarge,
+                                vertical = Dimensions.paddingMedium,
+                            ),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(
+                            Dimensions.paddingMedium
                         ),
                     ) {
+                        // Avatar
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primaryContainer),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = state.user?.username
+                                    ?.first()
+                                    ?.uppercaseChar()
+                                    ?.toString() ?: "?",
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
 
-                        // Profile header
-                        item {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = state.user?.username ?: "Guest",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onBackground,
+                            )
+                            Text(
+                                text = state.user?.email ?: "",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                text = state.user?.phoneNumber?.ifBlank { "No phone added" }
+                                    ?: "No phone added",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(Dimensions.paddingSmall))
+
+                    // ── Theme Toggle ──────────────────────────────
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Dimensions.paddingLarge)
+                            .clip(RoundedCornerShape(Dimensions.radiusMedium))
+                            .background(MaterialTheme.colorScheme.surface)
+                            .padding(Dimensions.paddingMedium),
+                    ) {
+                        Text(
+                            text = "Appearance",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(bottom = 8.dp),
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(
+                                Dimensions.paddingSmall
+                            ),
+                        ) {
+                            listOf(
+                                Triple("Light", ThemeMode.LIGHT, "☀️"),
+                                Triple("Dark", ThemeMode.DARK, "🌙"),
+                                Triple("System", ThemeMode.SYSTEM, "⚙️"),
+                            ).forEach { (label, mode, emoji) ->
+                                val selected = themeMode == mode
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(Dimensions.radiusSmall))
+                                        .background(
+                                            if (selected)
+                                                MaterialTheme.colorScheme.primaryContainer
+                                            else
+                                                MaterialTheme.colorScheme.surfaceVariant
+                                        )
+                                        .clickable { themeViewModel.setTheme(mode) }
+                                        .padding(vertical = 10.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                                    ) {
+                                        Text(text = emoji, style = MaterialTheme.typography.bodyMedium)
+                                        Text(
+                                            text = label,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = if (selected) FontWeight.Bold
+                                            else FontWeight.Normal,
+                                            color = if (selected)
+                                                MaterialTheme.colorScheme.primary
+                                            else
+                                                MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(Dimensions.paddingMedium))
+
+                    // ── Account Section ───────────────────────────
+                    SectionHeader(title = "Account")
+
+                    MenuGroup {
+                        MenuItem(
+                            icon = Icons.Filled.Person,
+                            label = "Profile",
+                            subtitle = "Edit your personal details",
+                            onClick = {},
+                        )
+                        MenuDivider()
+                        MenuItem(
+                            icon = Icons.Filled.Receipt,
+                            label = "Orders",
+                            subtitle = "View your order history",
+                            onClick = onOrdersClick,
+                        )
+                        MenuDivider()
+                        MenuItem(
+                            icon = Icons.Filled.Inbox,
+                            label = "Inbox",
+                            subtitle = "Messages and updates",
+                            onClick = {},
+                        )
+                        MenuDivider()
+                        MenuItem(
+                            icon = Icons.Filled.Star,
+                            label = "Ratings & Reviews",
+                            subtitle = "Your feedback on sellers",
+                            onClick = {},
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(Dimensions.paddingMedium))
+
+                    // ── Settings Section ──────────────────────────
+                    SectionHeader(title = "Settings")
+
+                    MenuGroup {
+                        MenuItem(
+                            icon = Icons.Filled.Payment,
+                            label = "Payment Settings",
+                            subtitle = "Manage payment methods",
+                            onClick = {},
+                        )
+                        MenuDivider()
+                        MenuItem(
+                            icon = Icons.Filled.Settings,
+                            label = "App Settings",
+                            subtitle = "Language, region and more",
+                            onClick = {},
+                        )
+                        MenuDivider()
+                        MenuItem(
+                            icon = Icons.Filled.Notifications,
+                            label = "Notification Preferences",
+                            subtitle = "Control what you hear from us",
+                            onClick = {},
+                        )
+                        MenuDivider()
+                        MenuItem(
+                            icon = Icons.Filled.Close,
+                            label = "Close Account",
+                            subtitle = "Permanently delete your account",
+                            onClick = {},
+                            isDestructive = true,
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(Dimensions.paddingMedium))
+
+                    // ── More Section ──────────────────────────────
+                    SectionHeader(title = "More")
+
+                    MenuGroup {
+                        MenuItem(
+                            icon = Icons.Filled.Policy,
+                            label = "Privacy Policy",
+                            subtitle = "How we handle your data",
+                            onClick = {},
+                        )
+                        MenuDivider()
+                        MenuItem(
+                            icon = Icons.Filled.Help,
+                            label = "Help & Support",
+                            subtitle = "Get help with your account",
+                            onClick = {},
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(Dimensions.paddingMedium))
+
+                    // ── Sign Out ──────────────────────────────────
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Dimensions.paddingLarge)
+                            .clip(RoundedCornerShape(Dimensions.radiusMedium))
+                            .background(MaterialTheme.colorScheme.surface)
+                            .clickable { showLogoutDialog = true }
+                            .padding(Dimensions.paddingMedium),
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(
+                                Dimensions.paddingMedium
+                            ),
+                        ) {
                             Box(
                                 modifier = Modifier
-                                    .fillMaxWidth()
+                                    .size(40.dp)
+                                    .clip(CircleShape)
                                     .background(
-                                        MaterialTheme.colorScheme.primaryContainer
-                                    )
-                                    .padding(Dimensions.paddingLarge),
+                                        MaterialTheme.colorScheme.errorContainer
+                                    ),
                                 contentAlignment = Alignment.Center,
-                            ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(80.dp)
-                                            .clip(CircleShape)
-                                            .background(Green50),
-                                        contentAlignment = Alignment.Center,
-                                    ) {
-                                        Text(
-                                            text = user.username?.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
-                                            style = MaterialTheme.typography.displayMedium,
-                                            color = Green600,
-                                            fontWeight = FontWeight.Bold,
-                                        )
-                                    }
-
-                                    Spacer(modifier = Modifier.height(Dimensions.paddingSmall))
-
-                                    Text(
-                                        text = user.username ?: "Unknown User",
-                                        style = MaterialTheme.typography.headlineMedium,
-                                        fontWeight = FontWeight.Bold,
-                                    )
-                                    Text(
-                                        text = user.role?.replaceFirstChar {
-                                            it.uppercase()
-                                        } ?: "Unknown Role",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        fontWeight = FontWeight.Medium,
-                                    )
-                                }
-                            }
-                        }
-
-                        // Account details
-                        item {
-                            Spacer(modifier = Modifier.height(Dimensions.paddingLarge))
-                            Text(
-                                text = "Account Details",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(
-                                    horizontal = Dimensions.paddingLarge,
-                                    vertical = Dimensions.paddingSmall,
-                                ),
-                            )
-                        }
-
-                        item {
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = Dimensions.paddingLarge),
-                                shape = RoundedCornerShape(Dimensions.radiusMedium),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surface,
-                                ),
-                                elevation = CardDefaults.cardElevation(
-                                    defaultElevation = Dimensions.cardElevation
-                                ),
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(
-                                        Dimensions.paddingMedium
-                                    ),
-                                ) {
-                                    ProfileInfoRow(
-                                        icon = {
-                                            Icon(
-                                                imageVector = Icons.Filled.Person,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                            )
-                                        },
-                                        label = "Username",
-                                        value = user.username ?: "N/A",
-                                    )
-                                    HorizontalDivider(
-                                        modifier = Modifier.padding(
-                                            vertical = Dimensions.paddingSmall
-                                        )
-                                    )
-                                    ProfileInfoRow(
-                                        icon = {
-                                            Icon(
-                                                imageVector = Icons.Filled.Star,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                            )
-                                        },
-                                        label = "Email",
-                                        value = user.email ?: "N/A",
-                                    )
-                                    HorizontalDivider(
-                                        modifier = Modifier.padding(
-                                            vertical = Dimensions.paddingSmall
-                                        )
-                                    )
-                                    ProfileInfoRow(
-                                        icon = {
-                                            Icon(
-                                                imageVector = Icons.Filled.Phone,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                            )
-                                        },
-                                        label = "Phone",
-                                        value = user.phoneNumber?.ifBlank {
-                                            "Not provided"
-                                        } ?: "Not provided",
-                                    )
-                                    HorizontalDivider(
-                                        modifier = Modifier.padding(
-                                            vertical = Dimensions.paddingSmall
-                                        )
-                                    )
-                                    ProfileInfoRow(
-                                        icon = {
-                                            Icon(
-                                                imageVector = Icons.Filled.Star,
-                                                contentDescription = null,
-                                                tint = if (user.isVerified == true)
-                                                    MaterialTheme.colorScheme.primary
-                                                else
-                                                    MaterialTheme.colorScheme.outline,
-                                            )
-                                        },
-                                        label = "Verified",
-                                        value = if (user.isVerified == true) "Yes" else "No",
-                                    )
-                                }
-                            }
-                        }
-
-                        // Delivery addresses
-                        item {
-                            Spacer(modifier = Modifier.height(Dimensions.paddingLarge))
-                            Text(
-                                text = "Delivery Addresses",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(
-                                    horizontal = Dimensions.paddingLarge,
-                                    vertical = Dimensions.paddingSmall,
-                                ),
-                            )
-                        }
-
-                        if (state.addresses.isEmpty()) {
-                            item {
-                                Card(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = Dimensions.paddingLarge),
-                                    shape = RoundedCornerShape(Dimensions.radiusMedium),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                    ),
-                                ) {
-                                    Text(
-                                        text = "No delivery addresses added yet.",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(
-                                            Dimensions.paddingMedium
-                                        ),
-                                    )
-                                }
-                            }
-                        } else {
-                            items(state.addresses) { address ->
-                                Card(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(
-                                            horizontal = Dimensions.paddingLarge,
-                                            vertical = Dimensions.paddingXSmall,
-                                        ),
-                                    shape = RoundedCornerShape(Dimensions.radiusMedium),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = MaterialTheme.colorScheme.surface,
-                                    ),
-                                    elevation = CardDefaults.cardElevation(
-                                        defaultElevation = Dimensions.cardElevation
-                                    ),
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(
-                                            Dimensions.paddingMedium
-                                        ),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(
-                                            Dimensions.paddingSmall
-                                        ),
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Filled.LocationOn,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(24.dp),
-                                        )
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(
-                                                    Dimensions.paddingXSmall
-                                                ),
-                                            ) {
-                                                Text(
-                                                    text = address.label,
-                                                    style = MaterialTheme.typography.titleMedium,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                )
-                                                if (address.isDefault) {
-                                                    Text(
-                                                        text = "Default",
-                                                        style = MaterialTheme.typography.labelSmall,
-                                                        color = MaterialTheme.colorScheme.primary,
-                                                        fontWeight = FontWeight.Medium,
-                                                    )
-                                                }
-                                            }
-                                            Text(
-                                                text = "${address.street}, ${address.city}, ${address.state}",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // Theme selector
-                        item {
-                            Spacer(modifier = Modifier.height(Dimensions.paddingLarge))
-                            Text(
-                                text = "Appearance",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(
-                                    horizontal = Dimensions.paddingLarge,
-                                    vertical = Dimensions.paddingSmall,
-                                ),
-                            )
-                        }
-
-                        item {
-                            val themeMode by themeViewModel.themeMode.collectAsState()
-
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = Dimensions.paddingLarge),
-                                shape = RoundedCornerShape(Dimensions.radiusMedium),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surface,
-                                ),
-                                elevation = CardDefaults.cardElevation(
-                                    defaultElevation = Dimensions.cardElevation
-                                ),
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(Dimensions.paddingMedium),
-                                ) {
-                                    Text(
-                                        text = "Theme",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                    )
-
-                                    Spacer(modifier = Modifier.height(Dimensions.paddingMedium))
-
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(
-                                            Dimensions.paddingSmall
-                                        ),
-                                    ) {
-                                        ThemeOption(
-                                            label = "Light",
-                                            icon = Icons.Filled.LightMode,
-                                            selected = themeMode == ThemeMode.LIGHT,
-                                            onClick = { themeViewModel.setTheme(ThemeMode.LIGHT) },
-                                            modifier = Modifier.weight(1f),
-                                        )
-                                        ThemeOption(
-                                            label = "Dark",
-                                            icon = Icons.Filled.DarkMode,
-                                            selected = themeMode == ThemeMode.DARK,
-                                            onClick = { themeViewModel.setTheme(ThemeMode.DARK) },
-                                            modifier = Modifier.weight(1f),
-                                        )
-                                        ThemeOption(
-                                            label = "System",
-                                            icon = Icons.Filled.SettingsBrightness,
-                                            selected = themeMode == ThemeMode.SYSTEM,
-                                            onClick = { themeViewModel.setTheme(ThemeMode.SYSTEM) },
-                                            modifier = Modifier.weight(1f),
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        // Logout button
-                        item {
-                            Spacer(modifier = Modifier.height(Dimensions.paddingLarge))
-                            Button(
-                                onClick = { showLogoutDialog = true },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = Dimensions.paddingLarge)
-                                    .height(Dimensions.buttonHeight),
-                                shape = RoundedCornerShape(Dimensions.radiusMedium),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.error,
-                                ),
                             ) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.Logout,
                                     contentDescription = null,
-                                    modifier = Modifier.padding(
-                                        end = Dimensions.paddingSmall
-                                    ),
-                                )
-                                Text(
-                                    text = "Log Out",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(20.dp),
                                 )
                             }
+                            Text(
+                                text = "Sign Out",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.error,
+                            )
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(Dimensions.paddingLarge))
+
+                    // App version
+                    Text(
+                        text = "BulkBasket v1.0.0-beta · Polaruuma",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .padding(bottom = Dimensions.paddingMedium),
+                    )
                 }
             }
         }
     }
 }
 
+// ── Reusable components ───────────────────────────────────────────
+
 @Composable
-private fun ProfileInfoRow(
-    icon: @Composable () -> Unit,
-    label: String,
-    value: String,
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Dimensions.paddingSmall),
+private fun SectionHeader(title: String) {
+    Text(
+        text = title.uppercase(),
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(
+            horizontal = Dimensions.paddingLarge,
+            vertical = Dimensions.paddingSmall,
+        ),
+    )
+}
+
+@Composable
+private fun MenuGroup(content: @Composable () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Dimensions.paddingLarge)
+            .clip(RoundedCornerShape(Dimensions.radiusMedium))
+            .background(MaterialTheme.colorScheme.surface),
     ) {
-        icon()
-        Column {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-            )
-        }
+        content()
     }
 }
 
 @Composable
-private fun ThemeOption(
+private fun MenuDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(start = 72.dp),
+        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+        thickness = 0.5.dp,
+    )
+}
+
+@Composable
+private fun MenuItem(
+    icon: ImageVector,
     label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    selected: Boolean,
+    subtitle: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier,
+    isDestructive: Boolean = false,
 ) {
-    Surface(
-        onClick = onClick,
-        modifier = modifier,
-        shape = RoundedCornerShape(Dimensions.radiusSmall),
-        color = if (selected)
-            MaterialTheme.colorScheme.primaryContainer
-        else
-            MaterialTheme.colorScheme.surfaceVariant,
-        border = if (selected) androidx.compose.foundation.BorderStroke(
-            width = 2.dp,
-            color = MaterialTheme.colorScheme.primary,
-        ) else null,
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(
+                horizontal = Dimensions.paddingMedium,
+                vertical = 14.dp,
+            ),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Dimensions.paddingMedium),
     ) {
-        Column(
-            modifier = Modifier.padding(Dimensions.paddingSmall),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+        // Icon container
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(
+                    if (isDestructive)
+                        MaterialTheme.colorScheme.errorContainer
+                    else
+                        MaterialTheme.colorScheme.primaryContainer
+                ),
+            contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = icon,
-                contentDescription = label,
-                tint = if (selected)
-                    MaterialTheme.colorScheme.primary
+                contentDescription = null,
+                tint = if (isDestructive)
+                    MaterialTheme.colorScheme.error
                 else
-                    MaterialTheme.colorScheme.onSurfaceVariant,
+                    MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(20.dp),
             )
+        }
+
+        // Label and subtitle
+        Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = if (selected)
-                    MaterialTheme.colorScheme.primary
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = if (isDestructive)
+                    MaterialTheme.colorScheme.error
                 else
-                    MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                    MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+
+        // Chevron
+        Icon(
+            imageVector = Icons.Filled.ChevronRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
+        )
     }
 }

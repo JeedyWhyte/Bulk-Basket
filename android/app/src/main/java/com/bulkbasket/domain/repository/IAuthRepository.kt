@@ -16,4 +16,12 @@ interface IAuthRepository {
     suspend fun logout()
     suspend fun getProfile(): NetworkResult<User>
     suspend fun getAddresses(): NetworkResult<List<Address>>
+    suspend fun createAddress(
+        label: String,
+        street: String,
+        city: String,
+        state: String,
+        isDefault: Boolean,
+    ): NetworkResult<Address>
+    suspend fun updateFcmToken(token: String): NetworkResult<Unit>
 }

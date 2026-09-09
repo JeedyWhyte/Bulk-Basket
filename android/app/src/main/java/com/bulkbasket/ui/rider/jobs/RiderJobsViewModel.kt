@@ -53,11 +53,14 @@ class RiderJobsViewModel @Inject constructor(
                 is NetworkResult.Success -> activeResult.data
                 else -> emptyList()
             }
+            val error = (availableResult as? NetworkResult.Error)?.message
+                ?: (activeResult as? NetworkResult.Error)?.message
 
             _state.value = _state.value.copy(
                 isLoading = false,
                 availableDeliveries = available,
                 activeDeliveries = active,
+                error = error,
             )
         }
     }

@@ -608,26 +608,42 @@ if (status == OrderStatus.DELIVERED) { ... }
 
 ### Test Structure
 
-Use the **Arrange-Act-Assert** pattern:
+Backend tests use `pytest` with `pytest-django`: group related cases in a
+`@pytest.mark.django_db`-decorated class named `TestXxx`, with `test_*`
+methods (not Django's `TestCase` subclasses). Follow the
+**Arrange-Act-Assert** pattern within each test:
 
 ```python
 # Python example
-def test_create_order_success():
-    # Arrange
-    buyer = User.objects.create(email="buyer@test.com", user_type="buyer")
-    seller = Seller.objects.create(business_name="Test Shop")
-    product = Product.objects.create(seller=seller, name="Rice", price=1000)
-    
-    # Act
-    order = OrderService.create_order(
-        buyer=buyer,
-        items=[{"product_id": product.id, "quantity": 2}]
-    )
-    
-    # Assert
-    assert order.status == "pending"
-    assert order.total_amount == 2000
-    assert order.buyer == buyer
+@pytest.mark.django_db
+class TestCreateOrder:
+
+    def test_create_order_success(self):
+        # Arrange
+        buyer = User.objects.create_user(
+            username="buyer1", email="buyer@test.com", password="pass123", role="buyer"
+        )
+        seller = User.objects.create_user(
+            username="seller1", email="seller@test.com", password="pass123", role="seller"
+        )
+        address = Address.objects.create(user=buyer, label="Home", street="1 Market Rd", city="Lagos")
+        product = Product.objects.create(
+            seller=seller, name="Rice", price=Decimal("1000.00"), unit="bag",
+            stock_quantity=20, min_order_qty=1,
+        )
+
+        # Act
+        order = create_order(
+            buyer=buyer,
+            seller_id=seller.id,
+            items_data=[{"product_id": product.id, "quantity": 2}],
+            address=address,
+        )
+
+        # Assert
+        assert order.status == "pending"
+        assert order.total == Decimal("2000.00") + DELIVERY_FEE
+        assert order.buyer == buyer
 ```
 
 ### Test Naming

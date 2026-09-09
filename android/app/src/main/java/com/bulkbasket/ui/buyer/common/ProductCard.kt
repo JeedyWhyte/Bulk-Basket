@@ -1,5 +1,6 @@
 package com.bulkbasket.ui.buyer.common
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -52,6 +53,10 @@ fun ProductCard(
         elevation = CardDefaults.cardElevation(
             defaultElevation = Dimensions.cardElevation
         ),
+        border = BorderStroke(
+            width = Dimensions.cardBorderWidth,
+            color = MaterialTheme.colorScheme.outline,
+        ),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface,
         ),
@@ -67,7 +72,7 @@ fun ProductCard(
                     .fillMaxWidth()
                     .aspectRatio(1f)
                     .clip(RoundedCornerShape(Dimensions.radiusSmall))
-                    .background(Primary50),
+                    .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center,
             ) {
                 if (product.imageUrl != null) {

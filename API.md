@@ -7,7 +7,7 @@ Complete reference for the BulkBasket REST API.
 - Staging: `https://staging-api.bulkbasket.app/api/v1/`
 - Production: `https://api.bulkbasket.app/api/v1/`
 
-**Authentication:** Bearer JWT (issued by Supabase Auth)  
+**Authentication:** Bearer JWT (issued directly by this API via `djangorestframework-simplejwt`)  
 **Content-Type:** `application/json`  
 **API Version:** v1
 
@@ -34,30 +34,34 @@ Complete reference for the BulkBasket REST API.
 
 ## 🔐 Authentication
 
-All endpoints (except `/auth/signup/`, `/auth/login/`, `/auth/refresh/`) require a valid JWT token in the `Authorization` header:
+All endpoints except `/users/register/`, `/users/login/`, and `/users/token/refresh/` require a valid JWT access token in the `Authorization` header:
 
 ```http
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
+Tokens are issued by this API itself (`djangorestframework-simplejwt`) — there is **no** Supabase Auth integration. Supabase is used only to host the Postgres database in staging/production.
+
 ### Token Lifetime
 
 - **Access token:** 1 hour
-- **Refresh token:** 30 days
+- **Refresh token:** 7 days
+
+There is no server-side token blacklist/revocation configured, so there is no `/logout/` endpoint — clients simply discard the tokens they hold.
 
 ### Token Refresh Flow
 
 When the access token expires:
 
-1. Send the refresh token to `/auth/refresh/`
-2. Receive a new access token (and optionally a new refresh token)
+1. Send the refresh token to `/users/token/refresh/`
+2. Receive a new access token
 3. Retry the original request with the new token
 
 ```bash
 # Example: Refresh an expired token
-curl -X POST https://api.bulkbasket.app/api/v1/auth/refresh/ \
+curl -X POST https://api.bulkbasket.app/api/v1/users/token/refresh/ \
   -H "Content-Type: application/json" \
-  -d '{"refresh_token": "eyJhbGc..."}'
+  -d '{"refresh": "eyJhbGc..."}'
 ```
 
 ---
@@ -71,40 +75,42 @@ All requests should include:
 ```http
 Content-Type: application/json
 Authorization: Bearer <jwt_token>
-X-Request-ID: <optional-uuid-for-tracing>
-Accept-Language: en-NG
 ```
 
 ### Response Format
 
-All responses follow this envelope:
+The API does **not** use one global response envelope. Two shapes occur, and each endpoint below notes which one it uses:
+
+**1. Plain DRF representation** — most `GET`, and several `POST`/`PATCH`, endpoints (products, categories, addresses, seller/rider profiles, deliveries, notifications) return the serialized object or list with no wrapper at all:
 
 ```json
 {
-  "success": true,
-  "data": { ... },
-  "meta": {
-    "request_id": "uuid",
-    "timestamp": "2026-06-15T10:32:00Z"
-  }
+  "id": 1,
+  "name": "Long Grain Parboiled Rice",
+  "price": "42000.00"
 }
 ```
 
-For paginated responses:
+List endpoints return DRF's standard paginated envelope instead of a bare array — see [Pagination](#-pagination):
 
 ```json
 {
-  "success": true,
-  "data": [...],
-  "pagination": {
-    "page": 1,
-    "page_size": 20,
-    "total_pages": 5,
-    "total_count": 87,
-    "has_next": true,
-    "has_previous": false
-  },
-  "meta": { ... }
+  "count": 87,
+  "next": "http://localhost:8000/api/v1/products/?page=2",
+  "previous": null,
+  "results": [ ... ]
+}
+```
+
+A successful `DELETE` returns `204 No Content` with an empty body.
+
+**2. `status` / `message` / `data` envelope** — endpoints that do more than plain CRUD (registration, seller/rider profile creation, placing an order, updating an order or delivery status, notification-read actions, FCM token registration, nearby-sellers search) return:
+
+```json
+{
+  "status": "success",
+  "message": "Order placed successfully.",
+  "data": { ... }
 }
 ```
 
@@ -112,26 +118,40 @@ For paginated responses:
 
 ## ❌ Error Responses
 
-### Error Schema
+There is no `error.code`, `details`, or top-level `success` field anywhere in the API. Two shapes occur:
 
-All errors follow this format:
+**1. Business-rule / not-found errors** raised by view code reuse the envelope above with `status: "error"`:
 
 ```json
 {
-  "success": false,
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "Human-readable error message",
-    "details": {
-      "field_name": ["specific error about this field"]
-    }
-  },
-  "meta": {
-    "request_id": "uuid",
-    "timestamp": "2026-06-15T10:32:00Z"
-  }
+  "status": "error",
+  "message": "Insufficient stock for 'Long Grain Rice'. Available: 5."
 }
 ```
+
+**2. DRF's default validation / auth / permission errors** pass straight through DRF's built-in exception handling, unwrapped:
+
+```json
+{
+  "email": ["A user with this email already exists."],
+  "password": ["Ensure this field has at least 8 characters."]
+}
+```
+
+```json
+{ "detail": "Authentication credentials were not provided." }
+```
+
+One custom case is layered on top of DRF's default handler (`apps/common/exceptions.py`, wired via `EXCEPTION_HANDLER` in settings): deleting a row that's still referenced through an `on_delete=PROTECT` foreign key (e.g. a `Product` still referenced by an `OrderItem`) is converted from an unhandled `500` into a clean `400`:
+
+```json
+{
+  "status": "error",
+  "message": "This item cannot be deleted because it is still referenced by other records."
+}
+```
+
+In practice this path isn't reachable through `DELETE /products/<id>/` today — that endpoint soft-deletes the product (see below) instead of issuing a real row delete — but the handler stays in place as a safety net for any future hard-delete path.
 
 ### HTTP Status Codes
 
@@ -140,48 +160,20 @@ All errors follow this format:
 | `200` | OK | Successful GET, PATCH, PUT |
 | `201` | Created | Successful POST creating a resource |
 | `204` | No Content | Successful DELETE |
-| `400` | Bad Request | Invalid request body or parameters |
+| `400` | Bad Request | Invalid request body, failed validation, or a business-rule violation (e.g. out of stock, illegal status transition, duplicate email) |
 | `401` | Unauthorized | Missing or invalid JWT |
-| `403` | Forbidden | Authenticated but lacking permission |
-| `404` | Not Found | Resource doesn't exist |
-| `409` | Conflict | Resource conflict (e.g., duplicate) |
-| `422` | Unprocessable Entity | Validation failed |
-| `429` | Too Many Requests | Rate limit exceeded |
+| `403` | Forbidden | Authenticated but lacking permission (wrong role, or not the resource owner) |
+| `404` | Not Found | Resource doesn't exist (or isn't visible to the caller) |
 | `500` | Internal Server Error | Server-side issue |
-| `503` | Service Unavailable | Maintenance or overload |
 
-### Common Error Codes
-
-| Code | Message | HTTP Status |
-|------|---------|-------------|
-| `AUTH_INVALID_TOKEN` | Invalid or expired JWT | 401 |
-| `AUTH_MISSING_TOKEN` | No authorization header | 401 |
-| `PERMISSION_DENIED` | Not authorized for this resource | 403 |
-| `RESOURCE_NOT_FOUND` | Resource does not exist | 404 |
-| `VALIDATION_ERROR` | Field validation failed | 422 |
-| `DUPLICATE_RESOURCE` | Resource already exists | 409 |
-| `OUT_OF_STOCK` | Product insufficient stock | 422 |
-| `INVALID_ORDER_STATUS` | Status transition not allowed | 422 |
-| `RATE_LIMIT_EXCEEDED` | Too many requests | 429 |
-| `INTERNAL_ERROR` | Unexpected server error | 500 |
+`409`, `422`, and `429` are **not** used anywhere in this codebase — validation and business-rule failures come back as `400`, and there is currently no rate limiting (see [Rate Limiting](#-rate-limiting)).
 
 ### Example Error Response
 
 ```json
 {
-  "success": false,
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Validation failed for the request",
-    "details": {
-      "email": ["This field is required"],
-      "password": ["Password must be at least 8 characters"]
-    }
-  },
-  "meta": {
-    "request_id": "abc-123",
-    "timestamp": "2026-06-15T10:32:00Z"
-  }
+  "email": ["A user with this email already exists."],
+  "password": ["Ensure this field has at least 8 characters."]
 }
 ```
 
@@ -189,58 +181,63 @@ All errors follow this format:
 
 ## 🔑 Auth Endpoints
 
-### POST `/auth/signup/`
+These endpoints live under the `/users/` prefix, not `/auth/`.
+
+### POST `/users/register/`
 
 Register a new user account.
 
 **Authentication:** None required
+**Response shape:** `status`/`message`/`data` envelope
 
 **Request Body:**
 
 ```json
 {
+  "username": "janedoe",
   "email": "user@example.com",
   "password": "SecurePass123!",
-  "user_type": "buyer",
-  "full_name": "Jane Doe",
-  "phone": "+2348012345678"
+  "role": "buyer",
+  "phone_number": "+2348012345678"
 }
 ```
 
 **Field Validations:**
-- `email` — Required, valid email format, unique
-- `password` — Required, min 8 chars, must include letter and number
-- `user_type` — Required, one of: `buyer`, `seller`, `rider`
-- `full_name` — Required, 2-100 characters
-- `phone` — Optional, valid international format
+- `username` — Required, unique (inherited from Django's `AbstractUser`)
+- `email` — Required, unique
+- `password` — Required, min 8 characters
+- `role` — Optional, one of: `buyer`, `seller`, `rider` (defaults to `buyer`)
+- `phone_number` — Optional
 
 **Success Response (201):**
 
 ```json
 {
-  "success": true,
+  "status": "success",
+  "message": "Registration successful",
   "data": {
-    "user_id": "550e8400-e29b-41d4-a716-446655440000",
+    "id": 42,
+    "username": "janedoe",
     "email": "user@example.com",
-    "user_type": "buyer",
-    "access_token": "eyJhbGc...",
-    "refresh_token": "eyJhbGc...",
-    "expires_in": 3600,
-    "verification_required": true
+    "role": "buyer",
+    "phone_number": "+2348012345678",
+    "avatar_url": "",
+    "is_verified": false,
+    "created_at": "2026-06-15T10:00:00Z"
   }
 }
 ```
 
+Registration does **not** return an access/refresh token pair — call `/users/login/` afterwards to authenticate.
+
 **Possible Errors:**
-- `400` — Invalid request body
-- `409` — Email already registered
-- `422` — Validation failed
+- `400` — Invalid request body / validation failed (e.g. duplicate email or username, password too short)
 
 ---
 
-### POST `/auth/login/`
+### POST `/users/login/`
 
-Authenticate with email and password.
+Authenticate with username and password. This is `djangorestframework-simplejwt`'s stock `TokenObtainPairView` — the response is **not** wrapped in the `status`/`message`/`data` envelope.
 
 **Authentication:** None required
 
@@ -248,38 +245,30 @@ Authenticate with email and password.
 
 ```json
 {
-  "email": "user@example.com",
+  "username": "janedoe",
   "password": "SecurePass123!"
 }
 ```
+
+Note: login is by `username`, not `email` — the user model doesn't override `USERNAME_FIELD`.
 
 **Success Response (200):**
 
 ```json
 {
-  "success": true,
-  "data": {
-    "user_id": "550e8400-e29b-41d4-a716-446655440000",
-    "email": "user@example.com",
-    "user_type": "buyer",
-    "full_name": "Jane Doe",
-    "access_token": "eyJhbGc...",
-    "refresh_token": "eyJhbGc...",
-    "expires_in": 3600
-  }
+  "refresh": "eyJhbGc...",
+  "access": "eyJhbGc..."
 }
 ```
 
 **Possible Errors:**
-- `401` — Invalid credentials
-- `403` — Account suspended
-- `429` — Too many login attempts
+- `401` — Invalid credentials (`{"detail": "No active account found with the given credentials"}`)
 
 ---
 
-### POST `/auth/refresh/`
+### POST `/users/token/refresh/`
 
-Refresh an expired access token.
+Refresh an expired access token. Stock `TokenRefreshView`, also unwrapped.
 
 **Authentication:** None (uses refresh token)
 
@@ -287,7 +276,7 @@ Refresh an expired access token.
 
 ```json
 {
-  "refresh_token": "eyJhbGc..."
+  "refresh": "eyJhbGc..."
 }
 ```
 
@@ -295,143 +284,77 @@ Refresh an expired access token.
 
 ```json
 {
-  "success": true,
-  "data": {
-    "access_token": "eyJhbGc...",
-    "refresh_token": "eyJhbGc...",
-    "expires_in": 3600
-  }
+  "access": "eyJhbGc..."
 }
 ```
 
 ---
 
-### POST `/auth/logout/`
-
-Invalidate the current session.
-
-**Authentication:** Required
-
-**Request Body:** None
-
-**Success Response (204):** No content
-
----
-
-### POST `/auth/forgot-password/`
-
-Request a password reset email.
-
-**Authentication:** None required
-
-**Request Body:**
-
-```json
-{
-  "email": "user@example.com"
-}
-```
-
-**Success Response (200):**
-
-```json
-{
-  "success": true,
-  "data": {
-    "message": "Password reset email sent"
-  }
-}
-```
-
----
-
-### POST `/auth/reset-password/`
-
-Reset password using a reset token from email.
-
-**Authentication:** None required
-
-**Request Body:**
-
-```json
-{
-  "reset_token": "abc123...",
-  "new_password": "NewSecurePass456!"
-}
-```
-
-**Success Response (200):**
-
-```json
-{
-  "success": true,
-  "data": {
-    "message": "Password reset successful"
-  }
-}
-```
+There is no logout, forgot-password, or reset-password endpoint implemented in the current backend.
 
 ---
 
 ## 👤 User Endpoints
 
-### GET `/users/me/`
+### GET `/users/profile/`
 
 Get the authenticated user's profile.
 
 **Authentication:** Required
+**Response shape:** Plain DRF representation (unwrapped)
 
 **Success Response (200):**
 
 ```json
 {
-  "success": true,
-  "data": {
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "email": "user@example.com",
-    "user_type": "buyer",
-    "full_name": "Jane Doe",
-    "phone": "+2348012345678",
-    "avatar_url": "https://...",
-    "addresses": [
-      {
-        "id": "addr-uuid",
-        "label": "Home",
-        "street": "14 Akin Street",
-        "city": "Lagos",
-        "lat": 6.4541,
-        "lng": 3.3947,
-        "is_default": true
-      }
-    ],
-    "created_at": "2026-06-15T10:00:00Z"
-  }
+  "id": 42,
+  "username": "janedoe",
+  "email": "user@example.com",
+  "role": "buyer",
+  "phone_number": "+2348012345678",
+  "avatar_url": "https://...",
+  "is_verified": false,
+  "created_at": "2026-06-15T10:00:00Z"
 }
 ```
 
+Delivery addresses are **not** nested here — fetch them separately from `/users/addresses/`.
+
 ---
 
-### PATCH `/users/me/`
+### PATCH `/users/profile/`
 
 Update authenticated user's profile.
 
 **Authentication:** Required
 
-**Request Body:** (any subset of these fields)
+**Request Body:** (any subset of these writable fields)
 
 ```json
 {
-  "full_name": "Jane Smith",
-  "phone": "+2348012345678",
+  "username": "janedoe2",
+  "email": "new@example.com",
+  "phone_number": "+2348012345678",
   "avatar_url": "https://..."
 }
 ```
 
-**Success Response (200):** Updated user object
+`role`, `is_verified`, and `created_at` are read-only. There is no `full_name` field on the user model.
+
+**Success Response (200):** Updated user object (same shape as GET, unwrapped)
 
 ---
 
-### POST `/users/me/addresses/`
+### GET `/users/addresses/`
+
+List the authenticated user's delivery addresses.
+
+**Authentication:** Required
+**Response shape:** Paginated (`count`/`next`/`previous`/`results`)
+
+---
+
+### POST `/users/addresses/`
 
 Add a delivery address.
 
@@ -445,33 +368,112 @@ Add a delivery address.
   "street": "10 Marina",
   "city": "Lagos",
   "state": "Lagos State",
-  "country": "Nigeria",
-  "lat": 6.4500,
-  "lng": 3.3800,
+  "latitude": 6.4500,
+  "longitude": 3.3800,
   "is_default": false
 }
 ```
 
-**Success Response (201):** Created address object
+Field names are `latitude`/`longitude`, not `lat`/`lng`. There is no `country` field on the `Address` model.
+
+**Success Response (201):** Created address object, unwrapped
 
 ---
 
-### DELETE `/users/me/addresses/<id>/`
-
-Remove a delivery address.
-
-**Authentication:** Required  
-**Success Response (204):** No content
+Removing a delivery address is **not currently supported** by the API — there is no `DELETE` route for an individual address (the `addresses/` URL only wires up list + create).
 
 ---
 
 ## 🏪 Seller Endpoints
 
+Seller endpoints live under `/sellers/`, but the actual paths differ from a flat `/sellers/<id>/` shape.
+
+### POST `/sellers/profile/`
+
+Seller sets up their business profile (one-time, after registering with `role: "seller"`).
+
+**Authentication:** Required (seller)
+**Response shape:** `status`/`message`/`data` envelope
+
+**Request Body:**
+
+```json
+{
+  "business_name": "Eze Bulk Traders",
+  "market_name": "Lagos Island Market",
+  "description": "Family-owned bulk food store since 1985",
+  "latitude": 6.4550,
+  "longitude": 3.3950,
+  "opening_time": "08:00:00",
+  "closing_time": "18:00:00"
+}
+```
+
+**Success Response (201):** Created seller profile (see shape below)
+
+**Possible Errors:**
+- `400` — Seller profile already exists for this user
+
+---
+
+### GET `/sellers/profile/me/`
+
+Get the authenticated seller's own profile.
+
+**Authentication:** Required (seller)
+**Response shape:** Plain DRF representation (unwrapped)
+
+**Success Response (200):**
+
+```json
+{
+  "id": 7,
+  "username": "eze_traders",
+  "email": "eze@example.com",
+  "business_name": "Eze Bulk Traders",
+  "market_name": "Lagos Island Market",
+  "description": "Family-owned bulk food store since 1985",
+  "latitude": "6.455000",
+  "longitude": "3.395000",
+  "rating": "4.80",
+  "total_ratings": 142,
+  "is_open": true,
+  "opening_time": "08:00:00",
+  "closing_time": "18:00:00",
+  "products": [ ... ],
+  "created_at": "2026-01-15T10:00:00Z"
+}
+```
+
+`products` embeds the seller's **full** product list inline (every `Product`, not paginated) — there is no separate `/sellers/<id>/products/` endpoint.
+
+---
+
+### PATCH `/sellers/profile/me/`
+
+Update authenticated seller's profile. (This is the real path for what used to be documented as `PATCH /sellers/me/`.)
+
+**Authentication:** Required (seller)
+
+**Request Body:** Any subset of the seller-profile fields above (`rating`, `total_ratings`, `created_at` are read-only)
+**Success Response (200):** Updated seller profile, unwrapped
+
+---
+
+### GET `/sellers/<id>/`
+
+Get a seller's public profile. Same representation as `GET /sellers/profile/me/` above (including the embedded `products` list).
+
+**Authentication:** None required (`AllowAny`) — contrary to earlier docs, this endpoint is public.
+
+---
+
 ### GET `/sellers/nearby/`
 
 List sellers near a location.
 
-**Authentication:** Required
+**Authentication:** None required (`AllowAny`)
+**Response shape:** `status`/`message`/`data` envelope; **not paginated** — always returns the full matching list
 
 **Query Parameters:**
 
@@ -479,102 +481,45 @@ List sellers near a location.
 |-----------|------|----------|-------------|
 | `lat` | float | Yes | Buyer's latitude |
 | `lng` | float | Yes | Buyer's longitude |
-| `radius_km` | float | No | Search radius (default: 5km) |
-| `category` | string | No | Filter by product category |
-| `page` | int | No | Page number (default: 1) |
-| `page_size` | int | No | Results per page (default: 20, max: 50) |
+| `radius` | float | No | Search radius in km (default: 10) |
+
+There is no `category`, `page`, or `page_size` parameter — filtering by category and pagination are **not implemented** on this endpoint.
 
 **Example Request:**
 
 ```http
-GET /api/v1/sellers/nearby/?lat=6.4541&lng=3.3947&radius_km=5
+GET /api/v1/sellers/nearby/?lat=6.4541&lng=3.3947&radius=5
 ```
 
 **Success Response (200):**
 
 ```json
 {
-  "success": true,
+  "status": "success",
+  "message": "Success",
   "data": [
     {
-      "id": "seller-uuid",
-      "business_name": "Mama Chuka's Store",
-      "address": "Lagos Island Market",
-      "lat": 6.4550,
-      "lng": 3.3950,
-      "distance_km": 0.8,
-      "rating": 4.8,
-      "review_count": 142,
-      "is_verified": true,
-      "categories": ["grains", "produce"],
-      "image_url": "https://...",
-      "is_open": true
+      "id": 7,
+      "username": "eze_traders",
+      "email": "eze@example.com",
+      "business_name": "Eze Bulk Traders",
+      "market_name": "Lagos Island Market",
+      "description": "Family-owned bulk food store since 1985",
+      "latitude": "6.455000",
+      "longitude": "3.395000",
+      "rating": "4.80",
+      "total_ratings": 142,
+      "is_open": true,
+      "opening_time": "08:00:00",
+      "closing_time": "18:00:00",
+      "products": [ ... ],
+      "created_at": "2026-01-15T10:00:00Z"
     }
-  ],
-  "pagination": { ... }
+  ]
 }
 ```
 
----
-
-### GET `/sellers/<id>/`
-
-Get detailed seller information.
-
-**Authentication:** Required
-
-**Success Response (200):**
-
-```json
-{
-  "success": true,
-  "data": {
-    "id": "seller-uuid",
-    "business_name": "Mama Chuka's Store",
-    "description": "Family-owned bulk food store since 1985",
-    "address": "Lagos Island Market, Lagos",
-    "phone": "+2348012345678",
-    "lat": 6.4550,
-    "lng": 3.3950,
-    "rating": 4.8,
-    "review_count": 142,
-    "is_verified": true,
-    "is_open": true,
-    "opening_hours": {
-      "monday": "08:00-18:00",
-      "tuesday": "08:00-18:00",
-      "sunday": "closed"
-    },
-    "categories": ["grains", "produce", "spices"],
-    "image_url": "https://...",
-    "product_count": 62,
-    "joined_date": "2026-01-15"
-  }
-}
-```
-
----
-
-### GET `/sellers/<id>/products/`
-
-List a seller's products.
-
-**Authentication:** Required
-
-**Query Parameters:** Standard pagination + `category`, `sort_by`
-
-**Success Response (200):** Paginated list of products
-
----
-
-### PATCH `/sellers/me/`
-
-Update authenticated seller's profile.
-
-**Authentication:** Required (seller only)
-
-**Request Body:** Same fields as seller object  
-**Success Response (200):** Updated seller object
+`nearby_sellers` only returns sellers with `is_open=True` and both coordinates set; there's no `is_verified`, `review_count`, `address`, `phone`, `image_url`, or per-weekday `opening_hours` field on the seller model.
 
 ---
 
@@ -584,74 +529,60 @@ Update authenticated seller's profile.
 
 List all products with filtering.
 
-**Authentication:** Required
+**Authentication:** None required (`AllowAny`) for reads
+**Response shape:** Paginated (`count`/`next`/`previous`/`results`)
 
 **Query Parameters:**
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `category` | string | Filter by category |
+| `category` | string | Filter by category **slug** |
+| `unit` | string | Filter by exact unit (`kg`, `bag`, `basket`, `piece`, `bundle`) |
+| `is_available` | boolean | Filter by availability |
 | `min_price` | decimal | Minimum price filter |
 | `max_price` | decimal | Maximum price filter |
-| `in_stock` | boolean | Only show in-stock products |
-| `seller_id` | UUID | Filter by specific seller |
-| `sort_by` | string | `price`, `name`, `created_at` |
-| `order` | string | `asc` or `desc` (default: `desc`) |
+| `search` | string | Free-text search across `name` and `description` (DRF `SearchFilter`) |
+| `ordering` | string | `price`, `created_at`, or `-price`/`-created_at` for descending (DRF `OrderingFilter`) |
+| `seller` | string | Pass `seller=me` while authenticated to see **your own** listings, including unavailable ones |
 | `page` | int | Page number |
-| `page_size` | int | Results per page |
+| `page_size` | int | Results per page (max 100) |
+
+There is no `in_stock`, `seller_id`, `sort_by`, or `order` parameter — use `is_available`, `seller=me`, and `ordering` instead. Anonymous and buyer/rider requests only ever see `is_available=True` products; `seller=me` is the only way to include a seller's own unavailable products in a list.
 
 **Success Response (200):**
 
 ```json
 {
-  "success": true,
-  "data": [
+  "count": 87,
+  "next": "http://localhost:8000/api/v1/products/?page=2",
+  "previous": null,
+  "results": [
     {
-      "id": "prod-uuid",
+      "id": 12,
       "name": "Long Grain Parboiled Rice",
       "description": "Premium quality rice, 50kg bag",
-      "price": 42000.00,
-      "currency": "NGN",
-      "unit": "50kg bag",
-      "stock_qty": 18,
-      "category": "grains",
+      "price": "42000.00",
+      "unit": "bag",
+      "min_order_qty": 1,
+      "stock_quantity": 18,
       "image_url": "https://...",
-      "seller": {
-        "id": "seller-uuid",
-        "business_name": "Eze Bulk Traders",
-        "is_verified": true
-      },
+      "is_available": true,
+      "in_stock": true,
+      "category": 3,
+      "category_name": "Grains & Cereals",
+      "seller": 7,
+      "seller_name": "eze_traders",
       "created_at": "2026-06-10T10:00:00Z"
     }
-  ],
-  "pagination": { ... }
+  ]
 }
 ```
 
+`seller` and `category` are plain integer IDs (not nested objects), and there is no `currency` field.
+
 ---
 
-### GET `/products/search/`
-
-Search products by keyword.
-
-**Authentication:** Required
-
-**Query Parameters:**
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `q` | string | Yes | Search query |
-| `lat` | float | No | Filter by proximity |
-| `lng` | float | No | Filter by proximity |
-| `category` | string | No | Filter by category |
-
-**Example Request:**
-
-```http
-GET /api/v1/products/search/?q=rice&lat=6.4541&lng=3.3947
-```
-
-**Success Response (200):** Same format as GET `/products/`
+There is no `GET /products/search/` endpoint — use `?search=` on `GET /products/` instead (see above).
 
 ---
 
@@ -659,9 +590,15 @@ GET /api/v1/products/search/?q=rice&lat=6.4541&lng=3.3947
 
 Get product details.
 
-**Authentication:** Required
+**Authentication:** None required for the product itself; visibility depends on who's asking
+**Response shape:** Plain DRF representation (unwrapped)
 
-**Success Response (200):** Product object with full details
+**Visibility rules** (`ProductViewSet.get_queryset`, branch on `self.action == 'retrieve'`):
+- Anonymous or non-owning users can only retrieve a product where `is_available=True`.
+- An **authenticated seller can retrieve their own product even if it has been soft-deleted** (`is_available=False`) — not only via `?seller=me` on the list endpoint, but on this single-item endpoint too, without needing that query parameter.
+- Any other product owned by a different seller and currently unavailable returns `404`.
+
+**Success Response (200):** Product object with full details (same shape as a list item above)
 
 ---
 
@@ -670,6 +607,7 @@ Get product details.
 Create a new product (seller only).
 
 **Authentication:** Required (seller)
+**Response shape:** Plain DRF representation (unwrapped), `201`
 
 **Request Body:**
 
@@ -678,12 +616,15 @@ Create a new product (seller only).
   "name": "Long Grain Rice",
   "description": "Premium quality, harvested 2026",
   "price": 42000.00,
-  "unit": "50kg bag",
-  "stock_qty": 20,
-  "category": "grains",
+  "unit": "bag",
+  "min_order_qty": 1,
+  "stock_quantity": 20,
+  "category": 3,
   "image_url": "https://storage.supabase.co/..."
 }
 ```
+
+`category` is the category's integer ID. `seller` is set automatically from the authenticated user and cannot be passed in the body.
 
 **Success Response (201):** Created product object
 
@@ -691,21 +632,23 @@ Create a new product (seller only).
 
 ### PATCH `/products/<id>/`
 
-Update a product (seller only, must own the product).
+Update a product (seller only, must own the product — enforced by `get_queryset` restricting write actions to `seller=request.user`, so a non-owner gets `404`, not `403`).
 
-**Authentication:** Required
+**Authentication:** Required (seller)
 
-**Request Body:** Any subset of product fields  
-**Success Response (200):** Updated product object
+**Request Body:** Any subset of product fields
+**Success Response (200):** Updated product object, unwrapped
 
 ---
 
 ### DELETE `/products/<id>/`
 
-Delete a product (seller only).
+Delete a product (seller only, must own the product).
 
-**Authentication:** Required  
+**Authentication:** Required (seller)
 **Success Response (204):** No content
+
+This is a **soft delete**: `perform_destroy` sets `is_available=False` and saves — the row is never actually removed, so past orders that reference the product stay intact. Because of that, the FK-`PROTECT`-to-`400` error case described in [Error Responses](#-error-responses) is not triggered by this endpoint today; the delete always succeeds with `204`. The seller can still fetch the soft-deleted product afterwards via `GET /products/<id>/` or `?seller=me` (see the retrieve rules above).
 
 ---
 
@@ -713,29 +656,36 @@ Delete a product (seller only).
 
 List all product categories.
 
-**Authentication:** Required
+**Authentication:** None required (`AllowAny`)
+**Response shape:** Paginated (`count`/`next`/`previous`/`results`) — `CategoryViewSet` inherits the project's global `DEFAULT_PAGINATION_CLASS` (`apps/common/pagination.py`), so this is no longer a bare array.
 
 **Success Response (200):**
 
 ```json
 {
-  "success": true,
-  "data": [
+  "count": 12,
+  "next": null,
+  "previous": null,
+  "results": [
     {
-      "id": "grains",
+      "id": 3,
       "name": "Grains & Cereals",
-      "icon": "wheat",
-      "product_count": 142
+      "slug": "grains-cereals",
+      "icon_url": "https://..."
     },
     {
-      "id": "produce",
+      "id": 4,
       "name": "Fresh Produce",
-      "icon": "plant",
-      "product_count": 89
+      "slug": "fresh-produce",
+      "icon_url": "https://..."
     }
   ]
 }
 ```
+
+There is no `product_count` field on `Category` — it isn't annotated onto the queryset.
+
+`GET /products/categories/<id>/` (retrieve a single category) also exists, since `CategoryViewSet` is a `ReadOnlyModelViewSet`.
 
 ---
 
@@ -746,84 +696,79 @@ List all product categories.
 Place a new order (buyer only).
 
 **Authentication:** Required (buyer)
+**Response shape:** `status`/`message`/`data` envelope
 
 **Request Body:**
 
 ```json
 {
-  "seller_id": "seller-uuid",
-  "delivery_address_id": "addr-uuid",
+  "seller_id": 7,
+  "delivery_address_id": 3,
   "items": [
     {
-      "product_id": "prod-uuid",
+      "product_id": 12,
       "quantity": 2
     },
     {
-      "product_id": "prod-uuid-2",
+      "product_id": 15,
       "quantity": 1
     }
   ],
-  "delivery_notes": "Please call upon arrival",
-  "payment_method": "cash_on_delivery"
+  "notes": "Please call upon arrival"
 }
 ```
+
+`seller_id`, `delivery_address_id`, and `product_id` are integer IDs, not UUIDs (only the `Order` row itself uses a UUID primary key). The request field is `notes`, not `delivery_notes`, and there is no `payment_method` field anywhere in the order model — payment method isn't tracked by this API.
 
 **Success Response (201):**
 
 ```json
 {
-  "success": true,
+  "status": "success",
+  "message": "Order placed successfully.",
   "data": {
-    "id": "order-uuid",
-    "order_number": "BK-20840",
+    "id": "9d3f7b1e-...-uuid",
+    "buyer": 42,
+    "buyer_name": "janedoe",
+    "seller": 7,
+    "seller_name": "eze_traders",
     "status": "pending",
-    "buyer": { ... },
-    "seller": { ... },
+    "subtotal": "84000.00",
+    "delivery_fee": "500.00",
+    "total": "84500.00",
+    "notes": "Please call upon arrival",
     "items": [
       {
-        "product": { ... },
+        "id": 101,
+        "product": 12,
+        "product_name": "Long Grain Parboiled Rice",
+        "product_unit": "bag",
         "quantity": 2,
-        "price_at_purchase": 42000.00,
-        "subtotal": 84000.00
+        "unit_price": "42000.00",
+        "total_price": "84000.00"
       }
     ],
-    "subtotal": 90500.00,
-    "delivery_fee": 1500.00,
-    "total_amount": 92000.00,
-    "delivery_address": { ... },
-    "delivery_notes": "Please call upon arrival",
-    "payment_method": "cash_on_delivery",
     "created_at": "2026-06-15T10:32:00Z",
-    "estimated_delivery_time": "2026-06-15T11:30:00Z"
+    "updated_at": "2026-06-15T10:32:00Z"
   }
 }
 ```
 
+`delivery_fee` is currently a flat ₦500 (`DELIVERY_FEE` constant in `apps/orders/services.py`), not dynamically calculated. There is no `order_number`, `delivery_address` (nested), `payment_method`, or `estimated_delivery_time` field in the response.
+
 **Possible Errors:**
-- `400` — Invalid request
-- `404` — Product/seller not found
-- `409` — One or more products out of stock
-- `422` — Validation error
+- `400` — Delivery address not found, product doesn't exist, product doesn't belong to the given seller, product unavailable, insufficient stock, or quantity below `min_order_qty` (all as `{"status": "error", "message": "..."}`)
 
 ---
 
 ### GET `/orders/`
 
-List the authenticated user's orders.
+List the authenticated **buyer's** own orders.
 
-**Authentication:** Required
+**Authentication:** Required (buyer)
+**Response shape:** Paginated (`count`/`next`/`previous`/`results`)
 
-**Query Parameters:**
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `status` | string | Filter by order status |
-| `start_date` | date | Orders after this date |
-| `end_date` | date | Orders before this date |
-| `page` | int | Page number |
-| `page_size` | int | Results per page |
-
-**Success Response (200):** Paginated list of orders
+There is **no filtering or sorting support** on this endpoint — `status`, `start_date`, `end_date`, `sort_by`/`order` are not wired up (the view doesn't declare `filterset_fields`, `search_fields`, or `ordering_fields`, so the globally-enabled filter backends are no-ops here). Only `page`/`page_size` work. Results are ordered by `-created_at` (the model's default ordering).
 
 ---
 
@@ -831,308 +776,321 @@ List the authenticated user's orders.
 
 Get detailed order information.
 
-**Authentication:** Required (buyer, seller, or assigned rider)
+**Authentication:** Required — **buyer only**, and only for orders they placed (`get_queryset` filters `buyer=request.user`). Sellers and riders do **not** have access to this endpoint for an order they're involved in — sellers use `GET /orders/seller/` (list only, no single-order detail view), and riders work against the separate `Delivery` object via the delivery endpoints below.
 
-**Success Response (200):** Order object with full details
-
----
-
-### PATCH `/orders/<id>/accept/`
-
-Accept an incoming order (seller only).
-
-**Authentication:** Required (seller)
-
-**Request Body:** None  
-**Success Response (200):** Updated order with `status: "accepted"`
-
-**Side Effects:**
-- FCM notification sent to buyer
-- Realtime event broadcast to all subscribers
+**Success Response (200):** Order object with full details (same shape as the `data` in the create response), unwrapped
 
 ---
 
-### PATCH `/orders/<id>/reject/`
+### GET `/orders/seller/`
 
-Reject an incoming order (seller only).
+List all orders placed with the authenticated seller.
 
 **Authentication:** Required (seller)
+**Response shape:** Paginated (`count`/`next`/`previous`/`results`)
+
+No filtering/sorting is wired up here either.
+
+---
+
+### PATCH `/orders/seller/<id>/status/`
+
+Update the status of an order. This single endpoint replaces separate accept/reject/ready/cancel actions — there is **no** `PATCH /orders/<id>/accept/`, `/reject/`, `/ready/`, or `/cancel/` endpoint.
+
+**Authentication:** Required (seller, must own the order)
+**Response shape:** `status`/`message`/`data` envelope
 
 **Request Body:**
 
 ```json
 {
-  "reason": "Out of stock"
+  "status": "confirmed"
 }
 ```
 
-**Success Response (200):** Updated order with `status: "rejected"`
+`status` must be a legal next state for the order's current status — see [Order Status Lifecycle](#order-status-lifecycle) below. An illegal transition returns `400` with a message describing the allowed next states.
 
----
-
-### PATCH `/orders/<id>/ready/`
-
-Mark order as ready for pickup.
-
-**Authentication:** Required (seller)
-
-**Success Response (200):** Updated order with `status: "ready"`
-
-**Side Effects:**
-- Dispatch system searches for available rider
-- FCM notification to buyer
-
----
-
-### PATCH `/orders/<id>/cancel/`
-
-Cancel an order (buyer only, only if status is `pending` or `accepted`).
-
-**Authentication:** Required (buyer who placed order)
-
-**Request Body:**
+**Success Response (200):**
 
 ```json
 {
-  "reason": "Changed my mind"
+  "status": "success",
+  "message": "Order status updated to 'confirmed'.",
+  "data": { ... }
 }
 ```
 
-**Success Response (200):** Updated order with `status: "cancelled"`
+**Side Effects:**
+- A notification (and, if the buyer has an FCM token registered, a push notification) is sent to the buyer synchronously, in the same request — via `apps.notifications.services.notify_order_status_change`, called directly from the view. There is **no background/async task** involved; the `apps/orders/tasks.py` Celery task some older docs referenced no longer exists.
+- When status becomes `ready`, a `Delivery` row is created automatically so riders can see and claim the job (`get_or_create` in `apps/orders/state_machine.py`).
+
+There is currently **no endpoint for a buyer to cancel their own order** — cancellation (`status: "cancelled"`) can only be performed by the seller through this same endpoint.
 
 ---
 
 ### Order Status Lifecycle
 
 ```
-pending → accepted → preparing → ready → dispatched → delivered
-   ↓         ↓
-rejected  cancelled
+pending → confirmed → preparing → ready → in_transit → delivered
+   ↓          ↓            ↓
+cancelled  cancelled   cancelled
 ```
 
 | Status | Description | Who Can Trigger |
 |--------|-------------|-----------------|
 | `pending` | Order placed, awaiting seller response | Initial state |
-| `accepted` | Seller has accepted the order | Seller |
-| `rejected` | Seller declined the order | Seller |
+| `confirmed` | Seller has accepted the order | Seller |
 | `preparing` | Seller is preparing the goods | Seller |
-| `ready` | Ready for rider pickup | Seller |
-| `dispatched` | Rider has picked up | Rider |
-| `delivered` | Goods delivered to buyer | Rider |
-| `cancelled` | Buyer cancelled before fulfillment | Buyer |
+| `ready` | Ready for rider pickup; creates a `Delivery` | Seller |
+| `in_transit` | Rider has picked up (also set automatically when the linked delivery is marked `picked_up`) | Seller, or automatically via delivery pickup |
+| `delivered` | Goods delivered to buyer (also set automatically when the linked delivery is marked `delivered`) | Seller, or automatically via delivery completion |
+| `cancelled` | Order cancelled | Seller only (no buyer-initiated cancellation exists) |
+
+There is no `rejected`, `accepted`, or `dispatched` status — the actual choices are exactly the seven above (`apps/orders/models.py`, `Order.Status`).
 
 ---
 
 ## 🛵 Delivery Endpoints
 
-### GET `/delivery/jobs/`
+All delivery/rider endpoints live under `/delivery/`. The paths differ substantially from `/delivery/jobs/...`.
 
-List available delivery jobs (rider only).
+### POST `/delivery/profile/`
+
+Rider sets up their profile (one-time, after registering with `role: "rider"`).
 
 **Authentication:** Required (rider)
+**Response shape:** `status`/`message`/`data` envelope
 
-**Query Parameters:**
+**Request Body:**
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `lat` | float | Rider's current latitude |
-| `lng` | float | Rider's current longitude |
-| `radius_km` | float | Max distance for jobs |
+```json
+{
+  "is_available": true,
+  "current_latitude": 6.4541,
+  "current_longitude": 3.3947
+}
+```
+
+---
+
+### GET `/delivery/profile/me/`
+
+Get the authenticated rider's own profile.
+
+**Authentication:** Required (rider)
+**Response shape:** Plain DRF representation (unwrapped)
 
 **Success Response (200):**
 
 ```json
 {
-  "success": true,
-  "data": [
+  "id": 3,
+  "username": "chuka_rider",
+  "phone_number": "+2348012345678",
+  "is_available": true,
+  "current_latitude": "6.454100",
+  "current_longitude": "3.394700",
+  "total_deliveries": 118,
+  "rating": "4.90",
+  "created_at": "2026-01-10T10:00:00Z"
+}
+```
+
+---
+
+### PATCH `/delivery/profile/me/`
+
+Update the rider's own profile — this is also how a rider goes online/offline: set `is_available` here.
+
+**Authentication:** Required (rider)
+
+**Request Body:** Any subset of `is_available`, `current_latitude`, `current_longitude`
+**Success Response (200):** Updated rider profile, unwrapped
+
+There is no separate `POST /delivery/availability/` endpoint.
+
+---
+
+### GET `/delivery/available/`
+
+List deliveries that are pending assignment (available for any rider to claim).
+
+**Authentication:** Required (rider)
+**Response shape:** Paginated (`count`/`next`/`previous`/`results`)
+
+There are **no** `lat`/`lng`/`radius_km` query parameters — this list is simply every `Delivery` with `status='pending'`, with no proximity filtering.
+
+**Success Response (200):**
+
+```json
+{
+  "count": 4,
+  "next": null,
+  "previous": null,
+  "results": [
     {
-      "id": "delivery-uuid",
-      "order_number": "BK-20840",
-      "pickup": {
-        "address": "Lagos Island Market",
-        "lat": 6.4550,
-        "lng": 3.3950,
-        "business_name": "Eze Bulk Traders"
+      "id": 19,
+      "order": "9d3f7b1e-...-uuid",
+      "order_total": "84500.00",
+      "rider": null,
+      "rider_name": null,
+      "status": "pending",
+      "current_latitude": null,
+      "current_longitude": null,
+      "delivery_address": {
+        "street": "14 Akin Street",
+        "city": "Lagos",
+        "state": "Lagos State"
       },
-      "dropoff": {
-        "address": "14 Akin Street, Lagos",
-        "lat": 6.4541,
-        "lng": 3.3947
-      },
-      "distance_km": 2.3,
-      "estimated_earnings": 1500.00,
-      "estimated_duration_min": 25,
-      "package_count": 3
+      "assigned_at": null,
+      "picked_up_at": null,
+      "delivered_at": null,
+      "created_at": "2026-06-15T10:40:00Z"
     }
   ]
 }
 ```
 
+There is no `pickup`/business-name, `estimated_earnings`, `estimated_duration_min`, or `package_count` field.
+
 ---
 
-### POST `/delivery/jobs/<id>/accept/`
+### GET `/delivery/active/`
 
-Accept a delivery job.
+List the authenticated rider's currently active deliveries (`status` in `assigned` or `picked_up`).
 
 **Authentication:** Required (rider)
+**Response shape:** Paginated
 
-**Request Body:** None  
+---
+
+### GET `/delivery/<id>/`
+
+Get details of a specific delivery, restricted to the rider currently assigned to it.
+
+**Authentication:** Required (rider, must be the assigned rider — otherwise `404`)
+
+---
+
+### POST `/delivery/<id>/accept/`
+
+Accept/claim an available delivery job.
+
+**Authentication:** Required (rider)
+**Response shape:** `status`/`message`/`data` envelope
+
+**Request Body:** None
+
 **Success Response (200):**
 
 ```json
 {
-  "success": true,
-  "data": {
-    "delivery_id": "delivery-uuid",
-    "order_number": "BK-20840",
-    "status": "assigned",
-    "pickup_address": { ... },
-    "dropoff_address": { ... },
-    "buyer_phone": "+2348012345678",
-    "seller_phone": "+2348087654321"
-  }
+  "status": "success",
+  "message": "Delivery accepted.",
+  "data": { ... }
 }
 ```
 
----
-
-### PATCH `/delivery/<id>/picked-up/`
-
-Mark goods picked up from seller.
-
-**Authentication:** Required (assigned rider)
-
-**Success Response (200):** Updated delivery with `status: "in_transit"`
+**Possible Errors:**
+- `404` — Delivery not found, or already claimed by someone else
+- `400` — Rider has no rider profile, or the rider's `is_available` is `false`
 
 ---
 
-### PATCH `/delivery/<id>/delivered/`
+### PATCH `/delivery/<id>/status/`
 
-Mark goods delivered to buyer.
+Update a delivery's status. This replaces the separately-documented `picked-up`/`delivered` endpoints — there is a single generic status route.
 
-**Authentication:** Required (assigned rider)
+**Authentication:** Required (assigned rider only)
+**Response shape:** `status`/`message`/`data` envelope
 
 **Request Body:**
 
 ```json
 {
-  "confirmation_code": "1234"
+  "status": "picked_up"
 }
 ```
 
-The buyer confirms delivery with a 4-digit code shown in their app.
+Valid `Delivery.Status` values are `pending`, `assigned`, `picked_up`, `delivered`, `failed`. There is **no 4-digit buyer confirmation code** anywhere in the codebase — marking a delivery `delivered` requires no code from the buyer.
 
-**Success Response (200):** Updated delivery with `status: "delivered"`
-
----
-
-### GET `/delivery/earnings/`
-
-Get rider earnings summary.
-
-**Authentication:** Required (rider)
-
-**Query Parameters:**
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `period` | string | `today`, `week`, `month`, `all` |
-| `start_date` | date | Custom start date |
-| `end_date` | date | Custom end date |
+**Side Effects:**
+- Marking a delivery `picked_up` (while the order is `ready`) also moves the linked `Order` to `in_transit`.
+- Marking a delivery `delivered` (while the order is `in_transit`) also moves the linked `Order` to `delivered`, and increments the rider's `total_deliveries`.
+- Marking `assigned → failed` resets the delivery back to `pending` (unassigning the rider) so another rider can claim it, rather than leaving it permanently stuck.
 
 **Success Response (200):**
 
 ```json
 {
-  "success": true,
-  "data": {
-    "period": "today",
-    "total_earnings": 8400.00,
-    "total_deliveries": 12,
-    "average_per_delivery": 700.00,
-    "deliveries": [
-      {
-        "delivery_id": "uuid",
-        "order_number": "BK-20840",
-        "earnings": 1500.00,
-        "completed_at": "2026-06-15T10:32:00Z"
-      }
-    ]
-  }
+  "status": "success",
+  "message": "Delivery status updated to 'picked_up'.",
+  "data": { ... }
 }
 ```
 
 ---
 
-### POST `/delivery/availability/`
+### PATCH `/delivery/location/`
 
-Set rider availability (online/offline).
+Update the rider's live GPS location.
 
 **Authentication:** Required (rider)
+**Response shape:** `status`/`message` envelope (no `data`)
 
 **Request Body:**
 
 ```json
 {
-  "is_online": true,
-  "current_location": {
-    "lat": 6.4541,
-    "lng": 3.3947
-  }
+  "latitude": 6.4541,
+  "longitude": 3.3947
 }
 ```
+
+This updates both the rider's profile coordinates and, if the rider has a delivery currently `picked_up`, that delivery's live coordinates too.
 
 **Success Response (200):**
 
 ```json
 {
-  "success": true,
-  "data": {
-    "is_online": true,
-    "available_for_jobs": true
-  }
+  "status": "success",
+  "message": "Location updated."
 }
 ```
+
+---
+
+There is currently **no rider earnings endpoint** (`GET /delivery/earnings/` does not exist — there's no earnings/payout tracking anywhere in the `delivery` app).
 
 ---
 
 ## 🔔 Notification Endpoints
 
-### POST `/notifications/register-device/`
+### POST `/users/fcm-token/`
 
-Register an FCM device token for push notifications.
+Register (or overwrite) the caller's FCM device token for push notifications. This lives under `/users/`, not `/notifications/`.
 
 **Authentication:** Required
+**Response shape:** `status`/`message` envelope (no `data`)
 
 **Request Body:**
 
 ```json
 {
-  "fcm_token": "fcm-device-token...",
-  "device_type": "android",
-  "device_id": "unique-device-id"
+  "fcm_token": "fcm-device-token..."
 }
 ```
 
-**Success Response (201):** Device registered
+There is only a single `fcm_token` field per user (`User.fcm_token`) — there's no `device_type` or `device_id`, no multi-device support, and no corresponding "unregister" endpoint.
 
----
-
-### DELETE `/notifications/unregister-device/`
-
-Unregister an FCM device token.
-
-**Authentication:** Required
-
-**Request Body:**
+**Success Response (200):**
 
 ```json
 {
-  "device_id": "unique-device-id"
+  "status": "success",
+  "message": "Device registered for notifications."
 }
 ```
-
-**Success Response (204):** No content
 
 ---
 
@@ -1141,26 +1099,48 @@ Unregister an FCM device token.
 Get the user's notification history.
 
 **Authentication:** Required
+**Response shape:** Paginated (`count`/`next`/`previous`/`results`)
 
 **Success Response (200):**
 
 ```json
 {
-  "success": true,
-  "data": [
+  "count": 5,
+  "next": null,
+  "previous": null,
+  "results": [
     {
-      "id": "notif-uuid",
-      "type": "order_accepted",
-      "title": "Order Accepted",
-      "message": "Eze Bulk Traders has accepted your order #BK-20840",
+      "id": 88,
+      "title": "Order Update",
+      "body": "Eze Bulk Traders has confirmed your order.",
+      "notification_type": "order_confirmed",
       "data": {
-        "order_id": "order-uuid"
+        "order_id": "9d3f7b1e-...-uuid"
       },
-      "read": false,
+      "is_read": false,
       "created_at": "2026-06-15T10:32:00Z"
     }
-  ],
-  "pagination": { ... }
+  ]
+}
+```
+
+Field names are `body` (not `message`) and `is_read` (not `read`).
+
+---
+
+### GET `/notifications/unread/`
+
+Return the count of unread notifications for the authenticated user.
+
+**Authentication:** Required
+**Response shape:** `status`/`data` envelope
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "data": { "unread_count": 3 }
 }
 ```
 
@@ -1168,87 +1148,63 @@ Get the user's notification history.
 
 ### PATCH `/notifications/<id>/read/`
 
-Mark a notification as read.
+Mark a single notification as read.
 
-**Authentication:** Required  
-**Success Response (200):** Updated notification
+**Authentication:** Required
+**Response shape:** `status`/`message` envelope — the updated notification object is **not** returned in the response.
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "message": "Notification marked as read."
+}
+```
 
 ---
 
 ### PATCH `/notifications/mark-all-read/`
 
-Mark all notifications as read.
+Mark all of the user's notifications as read.
 
-**Authentication:** Required  
-**Success Response (200):** Count of marked notifications
+**Authentication:** Required
+**Response shape:** `status`/`message` envelope — no count of how many were marked is returned.
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "message": "All notifications marked as read."
+}
+```
 
 ---
 
 ## 🪝 Webhook Endpoints
 
-### POST `/webhooks/supabase/`
-
-Receive webhooks from Supabase (internal use).
-
-**Authentication:** Webhook secret in `X-Webhook-Secret` header
-
-**Request Body:** Supabase webhook payload
-
----
-
-### POST `/webhooks/fcm-callback/`
-
-Handle FCM delivery callbacks.
-
-**Authentication:** FCM signature verification
+**Not implemented.** There is no `apps.webhooks` app, and `config/urls.py` wires up no `/webhooks/` prefix at all. There is no Supabase webhook receiver and no FCM delivery-callback endpoint anywhere in the current backend.
 
 ---
 
 ## ⏱ Rate Limiting
 
-API requests are rate-limited per user.
+**Not implemented.** `REST_FRAMEWORK` in `backend/config/settings/base.py` sets no `DEFAULT_THROTTLE_CLASSES`/`DEFAULT_THROTTLE_RATES`, and there is no other throttling middleware in the codebase. No endpoint currently returns `429`, and no `X-RateLimit-*` headers are sent. The tables below describe an intended/future policy, not current behavior.
 
-### Default Limits
+### Default Limits (planned, not yet enforced)
 
 | Endpoint Type | Limit |
 |--------------|-------|
 | Auth endpoints | 5 requests/minute |
 | Read endpoints (GET) | 100 requests/minute |
 | Write endpoints (POST, PATCH, DELETE) | 30 requests/minute |
-| Search endpoints | 30 requests/minute |
-
-### Rate Limit Headers
-
-Every response includes:
-
-```http
-X-RateLimit-Limit: 100
-X-RateLimit-Remaining: 87
-X-RateLimit-Reset: 1718442000
-```
-
-### Exceeded Response
-
-When rate limit is exceeded (HTTP 429):
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "RATE_LIMIT_EXCEEDED",
-    "message": "Too many requests. Try again in 60 seconds.",
-    "details": {
-      "retry_after": 60
-    }
-  }
-}
-```
 
 ---
 
 ## 📄 Pagination
 
-All list endpoints support cursor-based or offset-based pagination.
+All list endpoints are paginated via DRF's `PageNumberPagination` (`apps/common/pagination.py`, wired globally as `DEFAULT_PAGINATION_CLASS`).
 
 ### Request Parameters
 
@@ -1261,20 +1217,14 @@ All list endpoints support cursor-based or offset-based pagination.
 
 ```json
 {
-  "success": true,
-  "data": [ ... ],
-  "pagination": {
-    "page": 1,
-    "page_size": 20,
-    "total_pages": 5,
-    "total_count": 87,
-    "has_next": true,
-    "has_previous": false,
-    "next_page": 2,
-    "previous_page": null
-  }
+  "count": 87,
+  "next": "http://localhost:8000/api/v1/products/?page=2",
+  "previous": null,
+  "results": [ ... ]
 }
 ```
+
+There is no `success`, `data`, or separate `pagination` object — this **is** the whole response body for a list endpoint. `next`/`previous` are full URLs (or `null`), not page numbers.
 
 ### Example Request
 
@@ -1286,35 +1236,34 @@ GET /api/v1/products/?page=2&page_size=50
 
 ## 🔍 Filtering & Sorting
 
-### Filtering
+Support varies per endpoint — only where a view explicitly declares `filterset_class`/`filterset_fields`, `search_fields`, or `ordering_fields` do the globally-enabled `DjangoFilterBackend`, `SearchFilter`, and `OrderingFilter` actually do anything. Today that's `GET /products/` (see [Product Endpoints](#-product-endpoints) for its exact filters); other list endpoints (orders, notifications, deliveries) only support `page`/`page_size`.
 
-Most list endpoints accept query parameters for filtering:
+### Filtering (products)
 
 ```http
-GET /api/v1/products/?category=grains&in_stock=true&min_price=1000
+GET /api/v1/products/?category=grains-cereals&is_available=true&min_price=1000
 ```
 
-### Sorting
+### Sorting (products)
 
-Use `sort_by` and `order` parameters:
+Use DRF's `ordering` parameter, not `sort_by`/`order`:
 
 ```http
-GET /api/v1/products/?sort_by=price&order=asc
+GET /api/v1/products/?ordering=price
+GET /api/v1/products/?ordering=-price
 ```
 
-### Multiple Filters
-
-Combine filters with `&`:
+### Searching (products)
 
 ```http
-GET /api/v1/orders/?status=delivered&start_date=2026-06-01&sort_by=created_at&order=desc
+GET /api/v1/products/?search=rice
 ```
 
 ---
 
 ## 📡 Real-Time Subscriptions
 
-For real-time updates, use Supabase Realtime WebSocket subscriptions directly from the client (not through this API).
+For real-time updates, use Supabase Realtime WebSocket subscriptions directly from the client (not through this API). This is independent of the Django REST endpoints documented above and can't be verified against `backend/apps/*`.
 
 ### Channels
 
@@ -1357,11 +1306,11 @@ It includes:
 
 ```bash
 # Login
-curl -X POST http://localhost:8000/api/v1/auth/login/ \
+curl -X POST http://localhost:8000/api/v1/users/login/ \
   -H "Content-Type: application/json" \
-  -d '{"email":"buyer@test.com","password":"Test123!"}'
+  -d '{"username":"buyer_test","password":"Test123!"}'
 
-# Get nearby sellers (with auth)
+# Get nearby sellers (public, no auth required)
 curl -X GET "http://localhost:8000/api/v1/sellers/nearby/?lat=6.4541&lng=3.3947" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 
@@ -1370,9 +1319,9 @@ curl -X POST http://localhost:8000/api/v1/orders/ \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
-    "seller_id": "seller-uuid",
-    "delivery_address_id": "addr-uuid",
-    "items": [{"product_id": "prod-uuid", "quantity": 2}]
+    "seller_id": 7,
+    "delivery_address_id": 3,
+    "items": [{"product_id": 12, "quantity": 2}]
   }'
 ```
 
@@ -1400,5 +1349,5 @@ We use URL-based API versioning:
 ---
 
 **API Version:** v1.0  
-**Last Updated:** June 2026  
+**Last Updated:** September 2026  
 **Maintained by:** The BulkBasket Project Team

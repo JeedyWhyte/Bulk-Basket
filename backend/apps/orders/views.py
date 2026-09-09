@@ -51,6 +51,7 @@ class BuyerOrderListCreateView(generics.ListCreateAPIView):
                 seller_id=data['seller_id'],
                 items_data=data['items'],
                 address=address,
+                notes=data.get('notes', ''),
             )
             notify_order_placed(order)
         except BusinessLogicError as e:

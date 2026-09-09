@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.bulkbasket.domain.model.Product
 import com.bulkbasket.domain.model.Seller
+import com.bulkbasket.domain.repository.IAuthRepository
 import com.bulkbasket.domain.repository.IProductRepository
 import com.bulkbasket.utils.NetworkResult
 import com.bulkbasket.utils.PreferencesManager
@@ -20,6 +21,8 @@ data class HomeState(
     val featuredProducts: List<Product> = emptyList(),
     val error: String? = null,
     val username: String = "",
+    // Fallback: Lagos. Replaced by the user's default address coordinates
+    // when they have one with a saved latitude/longitude.
     val userLat: Double = 6.6018,
     val userLng: Double = 3.3515,
 )
@@ -27,6 +30,7 @@ data class HomeState(
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val productRepository: IProductRepository,
+    private val authRepository: IAuthRepository,
     private val prefs: PreferencesManager,
 ) : ViewModel() {
 
@@ -35,7 +39,27 @@ class HomeViewModel @Inject constructor(
 
     init {
         loadUsername()
-        loadHomeData()
+        viewModelScope.launch {
+            resolveUserLocation()
+            loadHomeData()
+        }
+    }
+
+    /**
+     * Uses the buyer's default saved address as the search origin when it
+     * has coordinates; otherwise keeps the fallback location.
+     */
+    private suspend fun resolveUserLocation() {
+        val result = authRepository.getAddresses()
+        if (result is NetworkResult.Success) {
+            val address = result.data.firstOrNull { it.isDefault }
+                ?: result.data.firstOrNull()
+            val lat = address?.latitude?.toDoubleOrNull()
+            val lng = address?.longitude?.toDoubleOrNull()
+            if (lat != null && lng != null) {
+                _state.value = _state.value.copy(userLat = lat, userLng = lng)
+            }
+        }
     }
 
     private fun loadUsername() {

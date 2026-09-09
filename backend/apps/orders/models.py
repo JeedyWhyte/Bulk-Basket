@@ -60,7 +60,9 @@ class OrderItem(models.Model):
     )
     product = models.ForeignKey(
         'products.Product',
-        on_delete=models.CASCADE,
+        # PROTECT: deleting a product must never erase order history.
+        # The API soft-deletes products (is_available=False) instead.
+        on_delete=models.PROTECT,
     )
     quantity = models.PositiveIntegerField()
     unit_price = models.DecimalField(max_digits=12, decimal_places=2)

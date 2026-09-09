@@ -1,12 +1,14 @@
 from rest_framework import generics, permissions, status
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework_simplejwt.views import TokenObtainPairView
-from apps.common.responses import success_response
+from apps.common.responses import success_response, error_response
 from .models import Address
 from .serializers import (
     UserRegistrationSerializer,
     UserProfileSerializer,
     AddressSerializer,
 )
+from .services import update_fcm_token
 
 
 class RegisterView(generics.CreateAPIView):
@@ -41,3 +43,17 @@ class AddressListCreateView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def register_fcm_token(request):
+    """Store or refresh the caller's FCM device token for push delivery."""
+    token = request.data.get('fcm_token', '')
+    if not token:
+        return error_response(
+            message="'fcm_token' is required.",
+            status=400,
+        )
+    update_fcm_token(request.user, token)
+    return success_response(message="Device registered for notifications.")

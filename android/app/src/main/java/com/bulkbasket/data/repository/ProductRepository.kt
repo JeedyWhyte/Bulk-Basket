@@ -10,6 +10,9 @@ import com.bulkbasket.domain.repository.IProductRepository
 import com.bulkbasket.data.remote.dto.ProductCreateRequest
 import com.bulkbasket.data.remote.dto.SellerProfileCreateRequest
 import com.bulkbasket.utils.NetworkResult
+import com.bulkbasket.utils.errorMessage
+import com.bulkbasket.data.mappers.toCategory
+import com.bulkbasket.domain.model.Category
 import javax.inject.Inject
 
 class ProductRepository @Inject constructor(
@@ -37,7 +40,10 @@ class ProductRepository @Inject constructor(
                     response.body()!!.results.map { it.toProduct() }
                 )
             } else {
-                NetworkResult.Error("Failed to load products", response.code())
+                NetworkResult.Error(
+                    response.errorMessage("Failed to load products"),
+                    response.code(),
+                )
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")
@@ -50,7 +56,10 @@ class ProductRepository @Inject constructor(
             if (response.isSuccessful) {
                 NetworkResult.Success(response.body()!!.toProduct())
             } else {
-                NetworkResult.Error("Product not found", response.code())
+                NetworkResult.Error(
+                    response.errorMessage("Product not found"),
+                    response.code(),
+                )
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")
@@ -66,10 +75,13 @@ class ProductRepository @Inject constructor(
             val response = sellersApi.getNearbySellers(lat, lng, radius)
             if (response.isSuccessful) {
                 NetworkResult.Success(
-                    response.body()!!.map { it.toSeller() }
+                    response.body()?.data.orEmpty().map { it.toSeller() }
                 )
             } else {
-                NetworkResult.Error("Failed to load sellers", response.code())
+                NetworkResult.Error(
+                    response.errorMessage("Failed to load sellers"),
+                    response.code(),
+                )
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")
@@ -82,7 +94,25 @@ class ProductRepository @Inject constructor(
             if (response.isSuccessful) {
                 NetworkResult.Success(response.body()!!.toSeller())
             } else {
-                NetworkResult.Error("Seller not found", response.code())
+                NetworkResult.Error(
+                    response.errorMessage("Seller not found"),
+                    response.code(),
+                )
+            }
+        } catch (e: Exception) {
+            NetworkResult.Error(e.message ?: "Network error")
+        }
+    }
+
+    override suspend fun getCategories(): NetworkResult<List<Category>> {
+        return try {
+            val response = productsApi.getCategories()
+            if (response.isSuccessful) {
+                NetworkResult.Success(
+                    response.body()!!.results.map { it.toCategory() }
+                )
+            } else {
+                NetworkResult.Error("Failed to load categories", response.code())
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")
@@ -97,7 +127,10 @@ class ProductRepository @Inject constructor(
             if (response.isSuccessful) {
                 NetworkResult.Success(response.body()!!.toProduct())
             } else {
-                NetworkResult.Error("Failed to create product", response.code())
+                NetworkResult.Error(
+                    response.errorMessage("Failed to create product"),
+                    response.code(),
+                )
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")
@@ -113,7 +146,10 @@ class ProductRepository @Inject constructor(
             if (response.isSuccessful) {
                 NetworkResult.Success(response.body()!!.toProduct())
             } else {
-                NetworkResult.Error("Failed to update product", response.code())
+                NetworkResult.Error(
+                    response.errorMessage("Failed to update product"),
+                    response.code(),
+                )
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")
@@ -126,7 +162,10 @@ class ProductRepository @Inject constructor(
             if (response.isSuccessful) {
                 NetworkResult.Success(Unit)
             } else {
-                NetworkResult.Error("Failed to delete product", response.code())
+                NetworkResult.Error(
+                    response.errorMessage("Failed to delete product"),
+                    response.code(),
+                )
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")
@@ -141,7 +180,10 @@ class ProductRepository @Inject constructor(
                     response.body()!!.results.map { it.toProduct() }
                 )
             } else {
-                NetworkResult.Error("Failed to load products", response.code())
+                NetworkResult.Error(
+                    response.errorMessage("Failed to load products"),
+                    response.code(),
+                )
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")
@@ -154,7 +196,10 @@ class ProductRepository @Inject constructor(
             if (response.isSuccessful) {
                 NetworkResult.Success(response.body()!!.toSeller())
             } else {
-                NetworkResult.Error("Profile not found", response.code())
+                NetworkResult.Error(
+                    response.errorMessage("Profile not found"),
+                    response.code(),
+                )
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")
@@ -167,9 +212,17 @@ class ProductRepository @Inject constructor(
         return try {
             val response = sellersApi.createSellerProfile(request)
             if (response.isSuccessful) {
-                NetworkResult.Success(response.body()!!.toSeller())
+                val seller = response.body()?.data?.toSeller()
+                if (seller != null) {
+                    NetworkResult.Success(seller)
+                } else {
+                    NetworkResult.Error("Failed to create profile — empty response")
+                }
             } else {
-                NetworkResult.Error("Failed to create profile", response.code())
+                NetworkResult.Error(
+                    response.errorMessage("Failed to create profile"),
+                    response.code(),
+                )
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")
@@ -184,7 +237,10 @@ class ProductRepository @Inject constructor(
             if (response.isSuccessful) {
                 NetworkResult.Success(response.body()!!.toSeller())
             } else {
-                NetworkResult.Error("Failed to update profile", response.code())
+                NetworkResult.Error(
+                    response.errorMessage("Failed to update profile"),
+                    response.code(),
+                )
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")

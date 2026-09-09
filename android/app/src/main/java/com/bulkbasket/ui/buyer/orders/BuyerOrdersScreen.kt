@@ -37,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.bulkbasket.domain.model.Order
+import com.bulkbasket.ui.common.components.CurvedTopAppBar
 import com.bulkbasket.ui.seller.common.OrderStatusChip
 import com.bulkbasket.ui.theme.Dimensions
 
@@ -51,18 +52,20 @@ fun BuyerOrdersScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
+            CurvedTopAppBar {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Text(
                         text = "My Orders",
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimary,
                     )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
-            )
+                }
+            }
         },
     ) { innerPadding ->
 

@@ -87,17 +87,17 @@ Beautiful design that loads slowly is bad design. Aim for 60fps interactions.
   /* Warning */
   --color-warning-light:  #FFF3CD;
   --color-warning:        #FFC107;
-  --color-warning-dark:   #C39A03;
+  --color-warning-dark:   #856404;
 
   /* Error / Danger */
   --color-error-light:    #F8D7DA;
   --color-error:          #DC3545;
-  --color-error-dark:     #BD2130;
+  --color-error-dark:     #721C24;
 
   /* Info */
   --color-info-light:     #D1ECF1;
   --color-info:           #17A2B8;
-  --color-info-dark:      #117A8B;
+  --color-info-dark:      #0C5460;
 }
 ```
 
@@ -581,16 +581,15 @@ CDN: `https://tabler-icons.io/`
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-3);
+  padding: var(--space-4);
   background: var(--bg-elevated);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-subtle);
+  border-radius: 20px;         /* Dimensions.radiusMedium — no border, flat card */
 }
 
 .seller-card__avatar {
-  width: var(--size-avatar-md);
-  height: var(--size-avatar-md);
-  border-radius: var(--radius-md);
+  width: 48px;                 /* Dimensions: 48dp, not size-avatar-md */
+  height: 48px;
+  border-radius: var(--radius-full);  /* fully circular (CircleShape) */
   background: var(--color-primary-50);
   display: flex;
   align-items: center;
@@ -1127,41 +1126,38 @@ val Gray100 = Color(0xFFF5F5F5)
 
 // Type.kt
 val DisplayLarge = TextStyle(
-    fontFamily = SoraFontFamily,
-    fontWeight = FontWeight.ExtraBold,
-    fontSize = 36.sp,
-    lineHeight = 44.sp,
+    fontFamily = SoraFamily,
+    fontWeight = FontWeight.Bold,
+    fontSize = 32.sp,
+    lineHeight = 40.sp,
 )
 
 val BodyLarge = TextStyle(
-    fontFamily = InterFontFamily,
+    fontFamily = InterFamily,
     fontWeight = FontWeight.Normal,
     fontSize = 16.sp,
     lineHeight = 24.sp,
 )
 
-// Shapes.kt
-val Shapes = Shapes(
-    small = RoundedCornerShape(8.dp),
-    medium = RoundedCornerShape(12.dp),
-    large = RoundedCornerShape(16.dp),
-)
-
-// Theme.kt
+// Theme.kt — supports light/dark/system via ThemeMode; there is no
+// separate Shapes.kt — corner radii are applied per-composable from
+// Dimensions.kt (radiusSmall/Medium/Large/XLarge/Full) instead of being
+// wired into MaterialTheme's `shapes`.
 @Composable
-fun BulkBasketTheme(content: @Composable () -> Unit) {
+fun BulkBasketTheme(
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
+    content: @Composable () -> Unit,
+) {
+    val darkTheme = when (themeMode) {
+        ThemeMode.LIGHT  -> false
+        ThemeMode.DARK   -> true
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+    }
+
     MaterialTheme(
-        colorScheme = lightColorScheme(
-            primary = Primary700,
-            secondary = Accent500,
-            background = Color.White,
-            surface = Color.White,
-            onPrimary = Color.White,
-            onSurface = Color(0xFF1A1A1A),
-        ),
-        typography = BulkBasketTypography,
-        shapes = Shapes,
-        content = content
+        colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
+        typography = Typography,
+        content = content,
     )
 }
 ```

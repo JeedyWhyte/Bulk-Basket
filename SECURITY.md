@@ -165,18 +165,19 @@ Common attack surfaces we defend against:
 
 ### Authentication Flow
 
-BulkBasket uses **Supabase Auth** for identity management, issuing signed JWTs for all authenticated requests.
+BulkBasket uses **Django's own user model** (`apps.users.User`, an `AbstractUser` subclass) with **[djangorestframework-simplejwt](https://django-rest-framework-simplejwt.readthedocs.io/)** for token issuance and verification. The Django backend is the identity provider — there is no external auth provider in the request path; Supabase is used only as the hosted PostgreSQL database in production, not for authentication.
 
 ```
 ┌─────────────┐
 │   Client    │
 └──────┬──────┘
-       │ 1. POST /auth/login/ (email + password)
+       │ 1. POST /auth/login/ (username + password)
        ▼
 ┌─────────────────┐
-│  Supabase Auth  │──── Verifies credentials
+│  Django API     │──── TokenObtainPairView verifies credentials
+│  (SimpleJWT)    │     against apps.users.User
 └──────┬──────────┘
-       │ 2. Returns signed JWT + refresh token
+       │ 2. Returns signed JWT access + refresh token
        ▼
 ┌─────────────┐
 │   Client    │──── Stores tokens securely
@@ -184,7 +185,7 @@ BulkBasket uses **Supabase Auth** for identity management, issuing signed JWTs f
        │ 3. API request with `Authorization: Bearer <JWT>`
        ▼
 ┌─────────────────┐
-│  Django API     │──── Verifies JWT signature
+│  Django API     │──── JWTAuthentication verifies signature
 └──────┬──────────┘     Checks expiry & claims
        │ 4. Processes request
        ▼
@@ -197,26 +198,32 @@ BulkBasket uses **Supabase Auth** for identity management, issuing signed JWTs f
 - **Must contain:** At least 1 letter, 1 number
 - **Recommended:** Symbols, mixed case, 12+ characters
 - **Prohibited:** Common passwords (checked against known breach lists)
-- **Storage:** Bcrypt hashing with salt (handled by Supabase)
+- **Storage:** PBKDF2-SHA256 hashing with a per-password salt (Django's default `AUTH_PASSWORD_VALIDATORS`/hasher — no external provider involved)
 
 **Enforcement:**
 
 ```python
-# backend/apps/users/validators.py
-def validate_password_strength(password: str) -> None:
-    if len(password) < 8:
-        raise ValidationError("Password must be at least 8 characters")
-    if not any(c.isdigit() for c in password):
-        raise ValidationError("Password must contain at least 1 number")
-    if not any(c.isalpha() for c in password):
-        raise ValidationError("Password must contain at least 1 letter")
-    if password.lower() in COMMON_PASSWORDS:
-        raise ValidationError("This password is too common")
+# backend/config/settings/base.py
+AUTH_PASSWORD_VALIDATORS = [
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
+]
+```
+
+```python
+# backend/apps/users/serializers.py
+class UserRegistrationSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, min_length=8)
+    ...
 ```
 
 ### JWT Token Management
 
 **Token Structure:**
+
+SimpleJWT's default payload is used (no custom claims are added):
 
 ```json
 {
@@ -225,39 +232,45 @@ def validate_password_strength(password: str) -> None:
     "typ": "JWT"
   },
   "payload": {
-    "sub": "user-uuid",
-    "email": "user@example.com",
-    "user_type": "buyer",
+    "token_type": "access",
+    "user_id": 1,
     "iat": 1718442000,
     "exp": 1718445600,
-    "iss": "supabase"
+    "jti": "..."
   },
   "signature": "..."
 }
 ```
 
+The role (`buyer` / `seller` / `rider`) is not embedded in the token; it's looked up from the `User.role` field on each request via `request.user.role`.
+
 **Token Lifetimes:**
 - **Access token:** 1 hour (short-lived to limit damage if leaked)
-- **Refresh token:** 30 days (long-lived, stored securely)
+- **Refresh token:** 7 days
+
+```python
+# backend/config/settings/base.py
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+}
+```
 
 **Verification (Backend):**
 
+Every request is verified by DRF's built-in `JWTAuthentication` class, configured as the default authentication class rather than a hand-rolled decode function:
+
 ```python
-# Every request verifies the JWT
-def verify_jwt(token: str) -> dict:
-    try:
-        payload = jwt.decode(
-            token,
-            settings.SUPABASE_JWT_SECRET,
-            algorithms=["HS256"],
-            options={"require": ["exp", "sub", "user_type"]}
-        )
-        return payload
-    except jwt.ExpiredSignatureError:
-        raise AuthenticationFailed("Token expired")
-    except jwt.InvalidTokenError:
-        raise AuthenticationFailed("Invalid token")
+# backend/config/settings/base.py
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
+    ...
+}
 ```
+
+It validates the signature (using Django's `SECRET_KEY`, SimpleJWT's default signing key), checks expiry, and rejects the request with a 401 if either check fails.
 
 ### Multi-Factor Authentication (MFA)
 
@@ -282,16 +295,39 @@ Three primary user roles with distinct permissions:
 
 **Enforcement in Django:**
 
+Role checks are simple `BasePermission` classes, and object-level scoping is done by filtering each view's queryset to the caller rather than via `has_object_permission`:
+
 ```python
-# backend/apps/orders/permissions.py
-class IsOrderOwner(BasePermission):
-    def has_object_permission(self, request, view, order):
-        user = request.user
+# backend/apps/common/permissions.py
+class IsBuyer(BasePermission):
+    def has_permission(self, request, view):
         return (
-            order.buyer_id == user.id or
-            (user.user_type == "seller" and order.seller.user_id == user.id) or
-            (user.user_type == "rider" and order.delivery.rider_id == user.id)
+            request.user.is_authenticated
+            and request.user.role == 'buyer'
         )
+
+class IsSeller(BasePermission):
+    def has_permission(self, request, view):
+        return (
+            request.user.is_authenticated
+            and request.user.role == 'seller'
+        )
+
+class IsRider(BasePermission):
+    def has_permission(self, request, view):
+        return (
+            request.user.is_authenticated
+            and request.user.role == 'rider'
+        )
+```
+
+```python
+# backend/apps/orders/views.py — object scoping via get_queryset()
+class BuyerOrderListCreateView(generics.ListCreateAPIView):
+    permission_classes = [IsBuyer]
+
+    def get_queryset(self):
+        return Order.objects.filter(buyer=self.request.user)
 ```
 
 **Enforcement in Database (RLS):**
@@ -338,13 +374,13 @@ All data in transit is encrypted using **TLS 1.3**:
 
 ```python
 # backend/config/settings/production.py
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_SSL_REDIRECT = True
-SECURE_HSTS_SECONDS = 31536000  # 1 year
-SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-SECURE_HSTS_PRELOAD = True
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 ```
+
+**Note:** HTTP→HTTPS redirect and secure cookies are enforced today. `SECURE_HSTS_SECONDS` (and the related `INCLUDE_SUBDOMAINS`/`PRELOAD` flags) are not yet set in `production.py` — HSTS itself is not currently enabled and should be added before relying on it.
 
 #### At Rest
 Sensitive data is encrypted at rest:
@@ -467,7 +503,7 @@ ALTER TABLE orders ADD CONSTRAINT valid_status
 
 ### Rate Limiting
 
-Rate limits protect against abuse and DoS:
+**Current status: not yet implemented.** No DRF throttle classes are configured in `REST_FRAMEWORK` today, so no request-rate limits are enforced at the application layer. The table and snippet below describe the target design to implement before production launch:
 
 | Endpoint Category | Limit | Window |
 |-------------------|-------|--------|
@@ -478,10 +514,10 @@ Rate limits protect against abuse and DoS:
 | Search endpoints | 30 requests | 1 minute |
 | File uploads | 10 requests | 1 minute |
 
-**Implementation:**
+**Planned implementation:**
 
 ```python
-# backend/apps/common/rate_limits.py
+# backend/apps/common/rate_limits.py (not yet created)
 from rest_framework.throttling import UserRateThrottle
 
 class LoginRateThrottle(UserRateThrottle):
@@ -495,21 +531,22 @@ class PasswordResetThrottle(UserRateThrottle):
 
 ### CORS Policy
 
-Strict CORS to prevent unauthorized cross-origin requests:
+Cross-origin browser access is denied by default; BulkBasket's clients are native mobile apps, which don't send a browser `Origin` header and aren't affected by CORS at all:
 
 ```python
 # backend/config/settings/production.py
+# CORS — the clients are native mobile apps (no browser origin), so no
+# cross-origin browser access is needed. Add origins explicitly if a web
+# frontend is ever introduced.
+CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
-    "https://app.bulkbasket.app",
-    "https://admin.bulkbasket.app",
-]
-CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOWED_HEADERS = [
-    "authorization",
-    "content-type",
-    "x-request-id",
+    origin
+    for origin in os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',')
+    if origin
 ]
 ```
+
+`CORS_ALLOWED_ORIGINS` is empty unless the `CORS_ALLOWED_ORIGINS` environment variable is explicitly set, so no origin is trusted by default — an admin/web dashboard would need its origin added via that env var before it could call the API from a browser.
 
 ### Common Vulnerability Protection
 
@@ -743,23 +780,23 @@ Standard security middleware enabled:
 # backend/config/settings/base.py
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'apps.common.middleware.SecurityHeadersMiddleware',
-    'apps.common.middleware.RequestLoggingMiddleware',
 ]
 ```
 
 ### Security Headers
 
-Every response includes security headers:
+**Current status:** Django's `SecurityMiddleware` and `XFrameOptionsMiddleware` provide the baseline protections that ship with Django (e.g. `X-Content-Type-Options: nosniff`, clickjacking protection). There is no custom `apps.common.middleware.SecurityHeadersMiddleware` in the codebase today, so headers like `Content-Security-Policy` and `Permissions-Policy` are **not** currently set. Adding a dedicated middleware for those is planned:
 
 ```python
-# backend/apps/common/middleware.py
+# backend/apps/common/middleware.py (not yet created)
 class SecurityHeadersMiddleware:
     def process_response(self, request, response):
         response['X-Content-Type-Options'] = 'nosniff'
@@ -778,21 +815,47 @@ class SecurityHeadersMiddleware:
 ```python
 # backend/config/settings/production.py
 DEBUG = False
-ALLOWED_HOSTS = ["api.bulkbasket.app"]
+ALLOWED_HOSTS = os.environ.get(
+    'ALLOWED_HOSTS', 'bulkbasket-backend.onrender.com'
+).split(',')
 ```
 
 Detailed errors are logged server-side, but users see generic error pages.
 
+### Global Exception Handling
+
+A custom DRF exception handler normalizes error responses and prevents unhandled exceptions from leaking as raw 500s:
+
+```python
+# backend/apps/common/exceptions.py
+def custom_exception_handler(exc, context):
+    """Wraps DRF's default handler so deleting a row that's still
+    referenced through an on_delete=PROTECT FK (e.g. a Product referenced
+    by an OrderItem) comes back as a clean 400 instead of an unhandled 500.
+    """
+    if isinstance(exc, ProtectedError):
+        return Response(
+            {
+                "status": "error",
+                "message": "This item cannot be deleted because it is still referenced by other records.",
+            },
+            status=400,
+        )
+    return drf_exception_handler(exc, context)
+```
+
+It's wired in via `REST_FRAMEWORK["EXCEPTION_HANDLER"]` in `backend/config/settings/base.py`, so it runs for every API view. Today it specifically catches Django's `ProtectedError` (raised when deleting a row still referenced by an `on_delete=PROTECT` foreign key) and returns a clean 400 with no stack trace or query details, instead of surfacing an unhandled 500.
+
 ### Admin Panel Protection
 
-Django admin is protected by:
+**Current status:** the Django admin is currently mounted at the default `/admin/` path (`backend/config/urls.py`) with no IP allowlist, no MFA, and no dedicated audit-logging middleware — it relies on Django's standard staff/superuser login only. The hardening below is planned, not yet implemented:
 - Separate URL prefix (not `/admin/`)
 - IP allowlist (VPN only)
 - MFA required for admin accounts
 - Audit logging of all admin actions
 
 ```python
-# backend/apps/common/middleware.py
+# backend/apps/common/middleware.py (not yet created)
 class AdminIPRestrictionMiddleware:
     ALLOWED_IPS = ["10.0.0.0/8", "192.168.0.0/16"]
     
@@ -907,6 +970,24 @@ GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA public TO bulkbasket_app;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO bulkbasket_app;
 -- No DELETE permission — soft deletes only
 ```
+
+### Referential Integrity
+
+Deleting a product must never silently destroy order history, so the FK from an order line to its product is protective rather than cascading:
+
+```python
+# backend/apps/orders/models.py
+class OrderItem(models.Model):
+    ...
+    product = models.ForeignKey(
+        'products.Product',
+        # PROTECT: deleting a product must never erase order history.
+        # The API soft-deletes products (is_available=False) instead.
+        on_delete=models.PROTECT,
+    )
+```
+
+Sellers "delete" a product via `ProductViewSet.perform_destroy` (`backend/apps/products/views.py`), which sets `is_available=False` instead of removing the row. If any code path ever attempts a hard delete of a product still referenced by past orders, Postgres raises `ProtectedError`, which the global exception handler (see [Global Exception Handling](#-backend-security)) turns into a 400 instead of a 500.
 
 ### Backup Security
 

@@ -5,6 +5,7 @@ import com.bulkbasket.domain.model.Product
 import com.bulkbasket.domain.model.Seller
 import com.bulkbasket.utils.NetworkResult
 import com.bulkbasket.data.remote.dto.SellerProfileCreateRequest
+import com.bulkbasket.domain.model.Category
 
 interface IProductRepository {
     suspend fun getProducts(
@@ -42,4 +43,6 @@ interface IProductRepository {
     suspend fun updateSellerProfile(
         request: SellerProfileCreateRequest
     ): NetworkResult<Seller>
+
+    suspend fun getCategories(): NetworkResult<List<Category>>
 }

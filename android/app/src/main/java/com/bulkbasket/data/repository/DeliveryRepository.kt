@@ -10,6 +10,7 @@ import com.bulkbasket.domain.model.RiderProfile
 import com.bulkbasket.domain.model.Delivery
 import com.bulkbasket.domain.repository.IDeliveryRepository
 import com.bulkbasket.utils.NetworkResult
+import com.bulkbasket.utils.errorMessage
 import javax.inject.Inject
 
 class DeliveryRepository @Inject constructor(
@@ -20,9 +21,14 @@ class DeliveryRepository @Inject constructor(
         return try {
             val response = api.getAvailableDeliveries()
             if (response.isSuccessful) {
-                NetworkResult.Success(response.body()!!.map { it.toDelivery() })
+                NetworkResult.Success(
+                    response.body()!!.results.map { it.toDelivery() }
+                )
             } else {
-                NetworkResult.Error("Failed to load deliveries", response.code())
+                NetworkResult.Error(
+                    response.errorMessage("Failed to load deliveries"),
+                    response.code(),
+                )
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")
@@ -33,9 +39,14 @@ class DeliveryRepository @Inject constructor(
         return try {
             val response = api.getActiveDeliveries()
             if (response.isSuccessful) {
-                NetworkResult.Success(response.body()!!.map { it.toDelivery() })
+                NetworkResult.Success(
+                    response.body()!!.results.map { it.toDelivery() }
+                )
             } else {
-                NetworkResult.Error("Failed to load active deliveries", response.code())
+                NetworkResult.Error(
+                    response.errorMessage("Failed to load active deliveries"),
+                    response.code(),
+                )
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")
@@ -46,9 +57,17 @@ class DeliveryRepository @Inject constructor(
         return try {
             val response = api.acceptDelivery(id)
             if (response.isSuccessful) {
-                NetworkResult.Success(response.body()!!.toDelivery())
+                val delivery = response.body()?.data?.toDelivery()
+                if (delivery != null) {
+                    NetworkResult.Success(delivery)
+                } else {
+                    NetworkResult.Error("Failed to accept delivery — empty response")
+                }
             } else {
-                NetworkResult.Error("Failed to accept delivery", response.code())
+                NetworkResult.Error(
+                    response.errorMessage("Failed to accept delivery"),
+                    response.code(),
+                )
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")
@@ -62,9 +81,17 @@ class DeliveryRepository @Inject constructor(
         return try {
             val response = api.updateDeliveryStatus(id, DeliveryStatusRequest(status))
             if (response.isSuccessful) {
-                NetworkResult.Success(response.body()!!.toDelivery())
+                val delivery = response.body()?.data?.toDelivery()
+                if (delivery != null) {
+                    NetworkResult.Success(delivery)
+                } else {
+                    NetworkResult.Error("Failed to update status — empty response")
+                }
             } else {
-                NetworkResult.Error("Failed to update status", response.code())
+                NetworkResult.Error(
+                    response.errorMessage("Failed to update status"),
+                    response.code(),
+                )
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")
@@ -82,7 +109,10 @@ class DeliveryRepository @Inject constructor(
             if (response.isSuccessful) {
                 NetworkResult.Success(Unit)
             } else {
-                NetworkResult.Error("Failed to update location", response.code())
+                NetworkResult.Error(
+                    response.errorMessage("Failed to update location"),
+                    response.code(),
+                )
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")
@@ -95,7 +125,10 @@ class DeliveryRepository @Inject constructor(
             if (response.isSuccessful) {
                 NetworkResult.Success(response.body()!!.toRiderProfile())
             } else {
-                NetworkResult.Error("Profile not found", response.code())
+                NetworkResult.Error(
+                    response.errorMessage("Profile not found"),
+                    response.code(),
+                )
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")
@@ -110,9 +143,17 @@ class DeliveryRepository @Inject constructor(
                 RiderProfileRequest(is_available = isAvailable)
             )
             if (response.isSuccessful) {
-                NetworkResult.Success(response.body()!!.toRiderProfile())
+                val profile = response.body()?.data?.toRiderProfile()
+                if (profile != null) {
+                    NetworkResult.Success(profile)
+                } else {
+                    NetworkResult.Error("Failed to create profile — empty response")
+                }
             } else {
-                NetworkResult.Error("Failed to create profile", response.code())
+                NetworkResult.Error(
+                    response.errorMessage("Failed to create profile"),
+                    response.code(),
+                )
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")
@@ -129,7 +170,10 @@ class DeliveryRepository @Inject constructor(
             if (response.isSuccessful) {
                 NetworkResult.Success(response.body()!!.toRiderProfile())
             } else {
-                NetworkResult.Error("Failed to update profile", response.code())
+                NetworkResult.Error(
+                    response.errorMessage("Failed to update profile"),
+                    response.code(),
+                )
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")

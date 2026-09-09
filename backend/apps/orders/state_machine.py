@@ -16,6 +16,9 @@ def transition_order(order, new_status):
     """
     Move an order to a new status if the transition is valid.
     Raises BusinessLogicError if the transition is illegal.
+
+    When an order becomes 'ready', a Delivery is created so riders can
+    see and claim the job.
     """
     allowed = TRANSITIONS.get(order.status, [])
     if new_status not in allowed:
@@ -25,4 +28,11 @@ def transition_order(order, new_status):
         )
     order.status = new_status
     order.save(update_fields=['status', 'updated_at'])
+
+    if new_status == 'ready':
+        # Imported lazily to avoid a circular import
+        # (delivery.services imports this module).
+        from apps.delivery.models import Delivery
+        Delivery.objects.get_or_create(order=order)
+
     return order

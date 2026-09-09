@@ -28,7 +28,7 @@ interface ProductsApi {
     suspend fun getProduct(@Path("id") id: Int): Response<ProductDto>
 
     @GET("products/categories/")
-    suspend fun getCategories(): Response<List<CategoryDto>>
+    suspend fun getCategories(): Response<PaginatedResponse<CategoryDto>>
 
     @POST("products/")
     suspend fun createProduct(

@@ -1,9 +1,9 @@
 package com.bulkbasket.ui.buyer
 
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.bulkbasket.ui.buyer.cart.CartScreen
 import com.bulkbasket.ui.buyer.cart.CartViewModel
 import com.bulkbasket.ui.buyer.common.BuyerBottomNav
 import com.bulkbasket.ui.buyer.common.BuyerTab
@@ -18,45 +19,70 @@ import com.bulkbasket.ui.buyer.home.HomeScreen
 import com.bulkbasket.ui.buyer.orders.BuyerOrdersScreen
 import com.bulkbasket.ui.buyer.profile.ProfileScreen
 import com.bulkbasket.ui.buyer.search.BrowseScreen
+import com.bulkbasket.ui.buyer.category.CategoryScreen
 
 @Composable
 fun BuyerShellScreen(
+    openOrdersTab: Boolean = false,
+    onOrdersTabShown: () -> Unit = {},
     onNavigateToSeller: (Int) -> Unit,
     onNavigateToProduct: (Int) -> Unit,
     onNavigateToCart: () -> Unit,
+    onNavigateToOrders: () -> Unit,
     onNavigateToNotifications: () -> Unit,
+    onNavigateToCheckout: () -> Unit,
     onLogout: () -> Unit,
     cartViewModel: CartViewModel = hiltViewModel(),
 ) {
     var activeTab by remember { mutableStateOf<BuyerTab>(BuyerTab.Home) }
     val cartState by cartViewModel.state.collectAsState()
 
+    LaunchedEffect(openOrdersTab) {
+        if (openOrdersTab) {
+            activeTab = BuyerTab.Orders
+            onOrdersTabShown()
+        }
+    }
+
     Scaffold(
         bottomBar = {
             BuyerBottomNav(
                 activeTab = activeTab,
                 onTabSelected = { activeTab = it },
-                orderCount = cartState.itemCount,
+                cartCount = cartState.itemCount,
             )
         },
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
     ) { innerPadding ->
         when (activeTab) {
             BuyerTab.Home -> HomeScreen(
                 onSellerClick = onNavigateToSeller,
                 onProductClick = onNavigateToProduct,
-                onCartClick = onNavigateToCart,
-                onOrdersClick = { activeTab = BuyerTab.Orders },
+                onCartClick = { activeTab = BuyerTab.Cart },
+                onOrdersClick = {},
                 onProfileClick = { activeTab = BuyerTab.Account },
                 onNotificationsClick = onNavigateToNotifications,
+                onSearchClick = { activeTab = BuyerTab.Search },
                 modifier = Modifier.padding(innerPadding),
                 cartViewModel = cartViewModel,
             )
-            BuyerTab.Browse -> BrowseScreen(
+            BuyerTab.Category -> CategoryScreen(
                 onProductClick = onNavigateToProduct,
-                onCartClick = onNavigateToCart,
                 modifier = Modifier.padding(innerPadding),
                 cartViewModel = cartViewModel,
+            )
+            BuyerTab.Search -> BrowseScreen(
+                onProductClick = onNavigateToProduct,
+                onSellerClick = onNavigateToSeller,
+                onCartClick = { activeTab = BuyerTab.Cart },
+                modifier = Modifier.padding(innerPadding),
+                cartViewModel = cartViewModel,
+            )
+            BuyerTab.Cart -> CartScreen(
+                onBack = { activeTab = BuyerTab.Home },
+                onCheckout = onNavigateToCheckout,
+                onOrdersClick = onNavigateToOrders,
+                modifier = Modifier.padding(innerPadding),
+                viewModel = cartViewModel,
             )
             BuyerTab.Orders -> BuyerOrdersScreen(
                 onBack = { activeTab = BuyerTab.Home },
@@ -65,6 +91,7 @@ fun BuyerShellScreen(
             BuyerTab.Account -> ProfileScreen(
                 onBack = { activeTab = BuyerTab.Home },
                 onLogout = onLogout,
+                onOrdersClick = onNavigateToOrders,
                 modifier = Modifier.padding(innerPadding),
             )
         }

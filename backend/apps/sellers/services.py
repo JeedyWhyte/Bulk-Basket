@@ -43,6 +43,11 @@ def get_nearby_sellers(lat, lng, radius_km=10):
 
 
 def update_seller_rating(seller_profile, new_rating):
+    from decimal import Decimal
+
+    # rating is a DecimalField — mixing it with a float raises TypeError,
+    # so normalise the incoming rating first.
+    new_rating = Decimal(str(new_rating))
     total = seller_profile.rating * seller_profile.total_ratings
     seller_profile.total_ratings += 1
     seller_profile.rating = (total + new_rating) / seller_profile.total_ratings

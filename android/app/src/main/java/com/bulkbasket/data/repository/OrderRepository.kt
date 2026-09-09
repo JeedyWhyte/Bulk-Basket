@@ -7,6 +7,7 @@ import com.bulkbasket.data.remote.dto.OrderStatusRequest
 import com.bulkbasket.domain.model.Order
 import com.bulkbasket.domain.repository.IOrderRepository
 import com.bulkbasket.utils.NetworkResult
+import com.bulkbasket.utils.errorMessage
 import javax.inject.Inject
 
 class OrderRepository @Inject constructor(
@@ -21,7 +22,10 @@ class OrderRepository @Inject constructor(
                     response.body()!!.results.map { it.toOrder() }
                 )
             } else {
-                NetworkResult.Error("Failed to load orders", response.code())
+                NetworkResult.Error(
+                    response.errorMessage("Failed to load orders"),
+                    response.code(),
+                )
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")
@@ -34,7 +38,10 @@ class OrderRepository @Inject constructor(
             if (response.isSuccessful) {
                 NetworkResult.Success(response.body()!!.toOrder())
             } else {
-                NetworkResult.Error("Order not found", response.code())
+                NetworkResult.Error(
+                    response.errorMessage("Order not found"),
+                    response.code(),
+                )
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")
@@ -51,10 +58,13 @@ class OrderRepository @Inject constructor(
                 if (order != null) {
                     NetworkResult.Success(order)
                 } else {
-                    NetworkResult.Error("Failed to place order")
+                    NetworkResult.Error("Failed to place order — empty response")
                 }
             } else {
-                NetworkResult.Error("Failed to place order", response.code())
+                NetworkResult.Error(
+                    response.errorMessage("Failed to place order"),
+                    response.code(),
+                )
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")
@@ -70,7 +80,10 @@ class OrderRepository @Inject constructor(
                     response.body()!!.results.map { it.toOrder() }
                 )
             } else {
-                NetworkResult.Error("Failed to load orders", response.code())
+                NetworkResult.Error(
+                    response.errorMessage("Failed to load orders"),
+                    response.code(),
+                )
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")
@@ -88,10 +101,13 @@ class OrderRepository @Inject constructor(
                 if (order != null) {
                     NetworkResult.Success(order)
                 } else {
-                    NetworkResult.Error("Failed to update status")
+                    NetworkResult.Error("Failed to update status — empty response")
                 }
             } else {
-                NetworkResult.Error("Failed to update status", response.code())
+                NetworkResult.Error(
+                    response.errorMessage("Failed to update status"),
+                    response.code(),
+                )
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")

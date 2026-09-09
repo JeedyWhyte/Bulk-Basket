@@ -58,7 +58,9 @@ class CartViewModel @Inject constructor() : ViewModel() {
             currentItems.add(
                 CartItem(
                     product = product,
-                    quantity = 1,
+                    // The backend rejects orders below min_order_qty,
+                    // so the cart must start there, not at 1.
+                    quantity = maxOf(1, product.minOrderQty),
                     sellerId = sellerId,
                     sellerName = sellerName,
                 )
@@ -88,7 +90,9 @@ class CartViewModel @Inject constructor() : ViewModel() {
         val index = currentItems.indexOfFirst { it.product.id == productId }
         if (index >= 0) {
             val item = currentItems[index]
-            if (item.quantity <= 1) {
+            val minQty = maxOf(1, item.product.minOrderQty)
+            if (item.quantity <= minQty) {
+                // Going below the product's minimum removes it entirely.
                 currentItems.removeAt(index)
             } else {
                 currentItems[index] = item.copy(quantity = item.quantity - 1)

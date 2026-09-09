@@ -3,8 +3,12 @@ package com.bulkbasket.data.remote.api
 import com.bulkbasket.data.remote.dto.AddressDto
 import com.bulkbasket.data.remote.dto.AddressRequest
 import com.bulkbasket.data.remote.dto.ApiResponse
+import com.bulkbasket.data.remote.dto.FcmTokenRequest
 import com.bulkbasket.data.remote.dto.LoginRequest
 import com.bulkbasket.data.remote.dto.LoginResponse
+import com.bulkbasket.data.remote.dto.PaginatedResponse
+import com.bulkbasket.data.remote.dto.RefreshRequest
+import com.bulkbasket.data.remote.dto.RefreshResponse
 import com.bulkbasket.data.remote.dto.RegisterRequest
 import com.bulkbasket.data.remote.dto.UserDto
 import retrofit2.Response
@@ -20,6 +24,9 @@ interface AuthApi {
     @POST("users/login/")
     suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
 
+    @POST("users/token/refresh/")
+    suspend fun refreshToken(@Body request: RefreshRequest): Response<RefreshResponse>
+
     @GET("users/profile/")
     suspend fun getProfile(): Response<UserDto>
 
@@ -27,8 +34,11 @@ interface AuthApi {
     suspend fun updateProfile(@Body data: Map<String, String>): Response<UserDto>
 
     @GET("users/addresses/")
-    suspend fun getAddresses(): Response<List<AddressDto>>
+    suspend fun getAddresses(): Response<PaginatedResponse<AddressDto>>
 
     @POST("users/addresses/")
     suspend fun createAddress(@Body request: AddressRequest): Response<AddressDto>
+
+    @POST("users/fcm-token/")
+    suspend fun updateFcmToken(@Body request: FcmTokenRequest): Response<ApiResponse<Unit>>
 }

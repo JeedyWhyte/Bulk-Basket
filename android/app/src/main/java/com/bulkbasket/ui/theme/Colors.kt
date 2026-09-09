@@ -60,3 +60,9 @@ val Red500   = Error
 val Red50    = ErrorLight
 val White = Color(0xFFFFFFFF)
 val Black = Color(0xFF000000)
+
+// Surface variants for layered feel
+val SurfaceElevated  = Color(0xFFFFFFFF)
+val SurfaceDim       = Color(0xFFF0F4F1)
+val CardBorder       = Color(0xFFE8EDE9)
+val CardBorderDark   = Color(0xFF2A3D32)

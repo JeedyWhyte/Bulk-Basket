@@ -161,9 +161,9 @@ BulkBasket follows a **layered client-server architecture** with a real-time eve
 │  └─────────────────────────────────────────────────────────┘    │
 │                             │                                   │
 │  ┌──────────────┐    ┌─────────────┐    ┌────────────────┐      │
-│  │ Celery Tasks │    │   Redis     │    │ Supabase Auth  │      │
-│  │ (Async Jobs) │◄──►│  (Cache &   │    │  (JWT Tokens)  │      │
-│  │              │    │   Broker)   │    │                │      │
+│  │ Celery       │    │   Redis     │    │ Supabase Auth  │      │
+│  │ (configured, │◄──►│  (Cache &   │    │  (JWT Tokens)  │      │
+│  │  no jobs yet)│    │   Broker)   │    │                │      │
 │  └──────────────┘    └─────────────┘    └────────────────┘      │
 └────────────────────────────┬────────────────────────────────────┘
                              │
@@ -227,10 +227,10 @@ Buyer places order
          │              └───────────┬───────────┘
          │                          │
          ▼                          ▼
-   Celery Task              ┌──────────────────────┐
-   (FCM notify              │ WebSocket subscribers│
-    seller)                 │  • Buyer (track)     │
-                            │  • Seller (new order)│
+   Django notifications     ┌──────────────────────┐
+   service sends FCM        │ WebSocket subscribers│
+   push directly (no        │  • Buyer (track)     │
+   Celery task involved)    │  • Seller (new order)│
                             │  • Rider (job alert) │
                             └──────────────────────┘
 ```
@@ -249,19 +249,18 @@ Buyer places order
 | **Room (SQLite)** | Local database for offline caching |
 | **Hilt (Dagger)** | Dependency injection |
 | **Coil** | Image loading & caching |
-| **Supabase Kotlin SDK** | Realtime subscriptions & auth |
 | **Firebase Cloud Messaging** | Push notifications |
 
 ### Backend (Server)
 | Technology | Purpose |
 |-----------|---------|
 | **Python 3.11+** | Backend programming language |
-| **Django 4.2+** | Web framework |
+| **Django 5.0+** | Web framework |
 | **Django REST Framework** | REST API framework |
-| **Celery** | Async background task queue |
+| **Celery** | Async background task queue (configured; no tasks are wired up yet — notifications currently send synchronously) |
 | **Redis** | Cache + Celery message broker |
 | **PyJWT** | JWT token verification |
-| **python-decouple** | Environment configuration |
+| **python-dotenv** | Environment configuration |
 
 ### Database & Auth (Supabase)
 | Technology | Purpose |
@@ -314,12 +313,18 @@ cd backend
 # Copy environment variables template
 cp .env.example .env
 
-# Edit .env with your Supabase credentials
+# Edit .env with your credentials (see backend/.env.example for the full list)
+# DJANGO_ENV=development
+# SECRET_KEY=your-secret-key-here
+# DB_NAME=bulkbasket_dev
+# DB_USER=postgres
+# DB_PASSWORD=postgres
+# DB_HOST=db
+# DB_PORT=5432
+# REDIS_URL=redis://redis:6379/0
 # SUPABASE_URL=https://xxxxx.supabase.co
 # SUPABASE_KEY=your-anon-key
-# SUPABASE_JWT_SECRET=your-jwt-secret
-# DATABASE_URL=postgresql://...
-# REDIS_URL=redis://localhost:6379
+# FCM_SERVER_KEY=your-firebase-key
 
 # Spin up services with Docker Compose
 docker-compose up -d
@@ -335,8 +340,10 @@ docker-compose exec backend python manage.py migrate
 # Create a superuser (optional, for Django admin)
 docker-compose exec backend python manage.py createsuperuser
 
-# Verify backend is running
-curl http://localhost:8000/api/v1/health/
+# Verify backend is running (there's no dedicated /health/ endpoint yet,
+# so hit the admin login page instead)
+curl -I http://localhost:8000/admin/
+# Expected: HTTP/1.1 302 Found
 ```
 
 ### 3. Supabase Setup
@@ -346,8 +353,8 @@ curl http://localhost:8000/api/v1/health/
    - Project URL
    - `anon` public key
    - `service_role` secret key
-3. Navigate to **Settings → Database** and copy the connection string
-4. Run the SQL migrations in `backend/supabase/migrations/`
+3. Navigate to **Settings → Database** and copy the individual connection values (host, port, database name, user, password) into `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
+4. Schema is managed by Django's own migrations (`python manage.py migrate`, run in step 2) — apply the RLS policies from `backend/supabase/policies/` via the Supabase SQL editor
 5. Enable Row Level Security on all tables
 6. Add the credentials to your `.env` file
 
@@ -357,11 +364,6 @@ curl http://localhost:8000/api/v1/health/
 # Open Android Studio
 # File → Open → Select the `android/` folder
 
-# Update local.properties with your config
-echo "API_BASE_URL=http://10.0.2.2:8000/api/v1/" >> android/local.properties
-echo "SUPABASE_URL=https://xxxxx.supabase.co" >> android/local.properties
-echo "SUPABASE_KEY=your-anon-key" >> android/local.properties
-
 # Sync Gradle
 # Build → Make Project
 
@@ -369,7 +371,13 @@ echo "SUPABASE_KEY=your-anon-key" >> android/local.properties
 # Run → Run 'app'
 ```
 
-> **Note:** Android emulators use `10.0.2.2` to reach the host machine's localhost. Physical devices need your machine's LAN IP.
+> **Note:** The API base URL is a hardcoded constant in
+> `android/app/src/main/java/com/bulkbasket/utils/Constants.kt` — it is
+> **not** read from `local.properties`. It defaults to the production
+> backend (`https://bulkbasket-backend.onrender.com/api/v1/`). To point the
+> app at a local backend instead, temporarily edit that constant to your
+> PC's LAN IP (e.g. `http://192.168.x.x:8000/api/v1/`) and rebuild —
+> physical devices can't reach `10.0.2.2`, only the emulator can.
 
 ### 5. Firebase Cloud Messaging Setup
 
@@ -382,9 +390,9 @@ echo "SUPABASE_KEY=your-anon-key" >> android/local.properties
 ### 6. Verify the Setup
 
 ```bash
-# Check backend
-curl http://localhost:8000/api/v1/health/
-# Expected: {"status": "ok"}
+# Check backend (no /health/ endpoint yet — check the admin page responds)
+curl -I http://localhost:8000/admin/
+# Expected: HTTP/1.1 302 Found
 
 # Check Redis
 docker-compose exec redis redis-cli ping
@@ -424,9 +432,10 @@ bulkbasket/
 │   │   ├── delivery/               # Dispatch & tracking
 │   │   └── notifications/          # FCM integration
 │   ├── supabase/
-│   │   ├── migrations/             # SQL migration files
-│   │   └── policies/               # RLS policies
-│   └── tests/                      # Pytest test suite
+│   │   └── policies/               # RLS policies (schema itself is
+│   │                               #   managed by Django migrations)
+│   └── apps/*/tests/               # Pytest test suite (per-app, e.g.
+│                                   #   apps/orders/tests/)
 │
 ├── android/                        # Android app
 │   ├── build.gradle.kts
@@ -464,40 +473,37 @@ bulkbasket/
 
 Base URL: `http://localhost:8000/api/v1/`
 
-All endpoints (except `/auth/`) require a `Authorization: Bearer <JWT>` header.
+Tokens are issued directly by this API (`djangorestframework-simplejwt`) — there is no Supabase Auth integration. All endpoints except `/users/register/`, `/users/login/`, and `/users/token/refresh/` require an `Authorization: Bearer <JWT>` header. There is no `/auth/` prefix and no logout endpoint (clients just discard their tokens).
 
-### Authentication
+See [API.md](./API.md) for the full reference — this section is a condensed summary.
+
+### Auth & Users
 
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
-| `POST` | `/auth/signup/` | Register a new user | ❌ |
-| `POST` | `/auth/login/` | Log in with email/password | ❌ |
-| `POST` | `/auth/refresh/` | Refresh expired JWT | ❌ |
-| `POST` | `/auth/logout/` | Invalidate session | ✅ |
+| `POST` | `/users/register/` | Register a new user | ❌ |
+| `POST` | `/users/login/` | Log in with username/password | ❌ |
+| `POST` | `/users/token/refresh/` | Refresh an expired access token | ❌ |
+| `GET`/`PATCH` | `/users/profile/` | Get / update own profile | ✅ |
+| `GET`/`POST` | `/users/addresses/` | List / add delivery addresses | ✅ |
 
-**Signup Request:**
+**Register Request:**
 ```json
-POST /api/v1/auth/signup/
+POST /api/v1/users/register/
 {
+  "username": "janedoe",
   "email": "user@example.com",
-  "password": "SecurePass123",
-  "user_type": "buyer",  // buyer | seller | rider
-  "full_name": "Jane Doe",
-  "phone": "+2348012345678"
+  "password": "SecurePass123!",
+  "role": "buyer",
+  "phone_number": "+2348012345678"
 }
 ```
 
-**Login Response:**
+**Login Response** (unwrapped, from `TokenObtainPairView`):
 ```json
 {
-  "access_token": "eyJhbGciOi...",
-  "refresh_token": "eyJhbGciOi...",
-  "expires_in": 3600,
-  "user": {
-    "id": "uuid",
-    "email": "user@example.com",
-    "user_type": "buyer"
-  }
+  "refresh": "eyJhbGc...",
+  "access": "eyJhbGc..."
 }
 ```
 
@@ -505,220 +511,330 @@ POST /api/v1/auth/signup/
 
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
-| `GET` | `/products/` | List all products (paginated) | ✅ |
+| `GET` | `/products/` | List products (paginated, filterable) | ✅ |
 | `GET` | `/products/<id>/` | Get product details | ✅ |
-| `GET` | `/products/search/?q=rice` | Search products | ✅ |
+| `GET` | `/products/categories/` | List categories (paginated) | ✅ |
 | `POST` | `/products/` | Create product (seller only) | ✅ |
 | `PATCH` | `/products/<id>/` | Update product (seller only) | ✅ |
-| `DELETE` | `/products/<id>/` | Delete product (seller only) | ✅ |
+| `DELETE` | `/products/<id>/` | Soft-delete product (seller only) | ✅ |
 
 ### Sellers
 
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
-| `GET` | `/sellers/nearby/?lat=&lng=` | List nearby sellers | ✅ |
+| `GET` | `/sellers/nearby/` | List nearby sellers | ✅ |
 | `GET` | `/sellers/<id>/` | Get seller profile | ✅ |
-| `GET` | `/sellers/<id>/products/` | List seller's products | ✅ |
-| `PATCH` | `/sellers/me/` | Update own profile | ✅ |
+| `POST` | `/sellers/profile/` | Create seller profile | ✅ |
+| `GET`/`PATCH` | `/sellers/profile/me/` | Get / update own seller profile | ✅ |
 
 ### Orders
 
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
 | `POST` | `/orders/` | Place a new order (buyer) | ✅ |
-| `GET` | `/orders/` | List my orders | ✅ |
-| `GET` | `/orders/<id>/` | Get order details | ✅ |
-| `PATCH` | `/orders/<id>/accept/` | Accept order (seller) | ✅ |
-| `PATCH` | `/orders/<id>/reject/` | Reject order (seller) | ✅ |
-| `PATCH` | `/orders/<id>/ready/` | Mark ready for pickup | ✅ |
+| `GET` | `/orders/` | List my orders (buyer) | ✅ |
+| `GET` | `/orders/<id>/` | Get order details (buyer, own order) | ✅ |
+| `GET` | `/orders/seller/` | List orders for my store (seller) | ✅ |
+| `PATCH` | `/orders/seller/<id>/status/` | Advance order status (seller) | ✅ |
 
 **Place Order Request:**
 ```json
 POST /api/v1/orders/
 {
-  "seller_id": "uuid",
-  "delivery_address": {
-    "street": "14 Akin Street",
-    "city": "Lagos",
-    "lat": 6.4541,
-    "lng": 3.3947
-  },
+  "seller_id": 7,
+  "delivery_address_id": 3,
   "items": [
-    { "product_id": "uuid", "quantity": 2 },
-    { "product_id": "uuid", "quantity": 1 }
+    { "product_id": 12, "quantity": 2 },
+    { "product_id": 15, "quantity": 1 }
   ],
   "notes": "Please call on arrival"
 }
 ```
+`seller_id`, `delivery_address_id`, and `product_id` are integer IDs — only the `Order` row itself uses a UUID primary key. There's a single generic status-update endpoint for sellers, not separate accept/reject/ready routes.
 
 ### Delivery
 
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
-| `GET` | `/delivery/jobs/` | Available jobs (rider) | ✅ |
-| `POST` | `/delivery/jobs/<id>/accept/` | Accept delivery job | ✅ |
-| `PATCH` | `/delivery/<id>/picked-up/` | Mark picked up | ✅ |
-| `PATCH` | `/delivery/<id>/delivered/` | Mark delivered | ✅ |
-| `GET` | `/delivery/earnings/` | Earnings summary | ✅ |
+| `GET` | `/delivery/available/` | Available jobs (rider) | ✅ |
+| `GET` | `/delivery/active/` | My active deliveries (rider) | ✅ |
+| `POST` | `/delivery/<id>/accept/` | Accept a delivery job | ✅ |
+| `PATCH` | `/delivery/<id>/status/` | Update delivery status | ✅ |
+| `PATCH` | `/delivery/location/` | Push current GPS location | ✅ |
 
-### Error Response Format
+There's no earnings-summary endpoint currently.
 
-All errors follow this schema:
+### Response & Error Shapes
 
-```json
-{
-  "error": {
-    "code": "PRODUCT_NOT_FOUND",
-    "message": "Product with id 'xyz' does not exist",
-    "details": {}
-  }
-}
-```
+Two response shapes are used, not one global envelope: plain DRF serialization (most `GET`s) and a `{"status", "message", "data"}` envelope for actions like registration, placing an order, or updating a status. List endpoints use DRF's standard `{"count", "next", "previous", "results"}` pagination envelope.
 
-**Common HTTP Status Codes:**
-- `200` — Success
-- `201` — Resource created
-- `400` — Bad request (validation error)
-- `401` — Unauthorized (missing/invalid JWT)
-- `403` — Forbidden (insufficient permissions)
-- `404` — Not found
-- `429` — Rate limited
-- `500` — Server error
-
-> 📌 **Full Postman collection:** `docs/postman/BulkBasket.postman_collection.json`
+**Common HTTP Status Codes actually returned:** `200`, `201`, `204`, `400`, `401`, `403`, `404`, `500`. No rate limiting is configured yet, so `429` is never returned.
 
 ---
 
 ## 🗄 Database Schema
 
+This reflects the actual Django models (`backend/apps/*/models.py`), not the earlier Supabase-Auth-style design this section originally described. Table names below are the real Postgres table names Django generates (`<app_label>_<model_name>`). Every user-facing PK is a plain auto-incrementing integer **except** `orders_order`, which genuinely uses a UUID (`default=uuid.uuid4`). There is no separate `sellers` table with its own UUID — seller info lives in `sellers_sellerprofile`, one-to-one with `users_user`, and `products_product.seller_id`/`orders_order.seller_id` point straight at `users_user`, not at the seller profile.
+
 ### Entity Relationship Diagram
 
 ```
-┌──────────────┐         ┌──────────────┐         ┌──────────────┐
-│    users     │         │   sellers    │         │   products   │
-├──────────────┤         ├──────────────┤         ├──────────────┤
-│ id (PK)      │◄────────┤ user_id (FK) │◄────────┤ seller_id    │
-│ email        │         │ business_name│         │ name         │
-│ user_type    │         │ address      │         │ price        │
-│ full_name    │         │ lat, lng     │         │ unit         │
-│ phone        │         │ rating       │         │ stock_qty    │
-│ created_at   │         │ verified     │         │ category     │
-└──────┬───────┘         └──────────────┘         │ image_url    │
-       │                                          └──────┬───────┘
-       │                                                 │
-       │         ┌──────────────┐                        │
-       │         │   orders     │                        │
-       │         ├──────────────┤                        │
-       └────────►│ buyer_id (FK)│                        │
-                 │ seller_id    │                        │
-                 │ status       │      ┌──────────────┐  │
-                 │ total_amount │      │ order_items  │  │
-                 │ delivery_addr├─────►├──────────────┤  │
-                 │ created_at   │      │ order_id (FK)│  │
-                 └──────┬───────┘      │ product_id   │──┘
-                        │              │ quantity     │
-                        │              │ price_at_buy │
-                        ▼              └──────────────┘
-                 ┌──────────────┐
-                 │  deliveries  │
-                 ├──────────────┤
-                 │ order_id (FK)│
-                 │ rider_id (FK)│
-                 │ status       │
-                 │ pickup_time  │
-                 │ delivered_at │
-                 └──────────────┘
+┌───────────────────────┐        ┌───────────────────────┐
+│      users_user         │        │     users_address       │
+├───────────────────────┤        ├───────────────────────┤
+│ id (PK, int)              │◄───────┤ user_id (FK, CASCADE)   │
+│ username, email           │  1:N   │ label, street, city,    │
+│ password (Django auth,    │        │   state                  │
+│   not Supabase Auth)      │        │ latitude, longitude      │
+│ role: buyer / seller /   │        │ is_default                │
+│   rider (no "admin")     │        └───────────┬───────────┘
+│ phone_number               │                    │
+│ avatar_url, is_verified   │                    │ delivery_address_id
+│ fcm_token                  │                    │ (FK, nullable, SET_NULL)
+│ is_staff / is_superuser   │                    │
+│   (Django admin access)   │                    │
+│ created_at / updated_at   │                    │
+└──┬───────────┬──────────┘                    │
+   │ 1:1         │ 1:1                            │
+   │ (seller)    │ (rider)                        │
+   ▼             ▼                                 │
+┌────────────────┐ ┌────────────────────┐         │
+│ sellers_          │ │ delivery_            │         │
+│ sellerprofile      │ │ riderprofile         │         │
+├────────────────┤ ├────────────────────┤         │
+│ user_id (FK, 1:1)  │ │ user_id (FK, 1:1)      │         │
+│ business_name       │ │ is_available            │         │
+│ market_name         │ │ current_latitude/        │         │
+│ description         │ │   longitude                │         │
+│ latitude/longitude  │ │ total_deliveries          │         │
+│ rating,               │ │ rating                     │         │
+│   total_ratings      │ └────────────────────┘         │
+│ is_open, opening_time/                                     │
+│   closing_time        │                                     │
+└────────────────┘                                     │
+                                                             │
+users_user (role='seller') ───────────────┐                │
+        │ seller_id (FK, CASCADE)          │                │
+        ▼                                    │                │
+┌─────────────────────┐                    │                │
+│ products_product       │                    │                │
+├─────────────────────┤                    │                │
+│ id (PK, int)              │                    │                │
+│ seller_id (FK → users)    │                    │                │
+│ category_id (FK, nullable,│                    │                │
+│   SET_NULL)                │                    │                │
+│ name, description          │                    │                │
+│ price, unit                 │                    │                │
+│ min_order_qty                │                    │                │
+│ stock_quantity                │                    │                │
+│ image_url, is_available      │                    │                │
+└──────────┬──────────────┘                    │                │
+           │ product_id (FK, PROTECT)             │                │
+           ▼                                        ▼                ▼
+┌─────────────────────┐               ┌────────────────────────────┐
+│ orders_orderitem       │               │        orders_order            │
+├─────────────────────┤               ├────────────────────────────┤
+│ order_id (FK, CASCADE)   │◄──────────────┤ id (PK, UUID)                    │
+│ product_id (FK, PROTECT) │   1:N          │ buyer_id (FK → users_user)     │
+│ quantity                   │               │ seller_id (FK → users_user)    │
+│ unit_price                  │               │ delivery_address_id (FK,       │
+│ total_price                 │               │   nullable)                       │
+└─────────────────────┘               │ status, subtotal, delivery_fee,│
+                                          │   total, notes                     │
+                                          └──────────────┬──────────────┘
+                                                             │ 1:1 (order_id)
+                                                             ▼
+                                          ┌────────────────────────────┐
+                                          │      delivery_delivery         │
+                                          ├────────────────────────────┤
+                                          │ order_id (FK, 1:1, CASCADE)    │
+                                          │ rider_id (FK → users_user,     │
+                                          │   nullable, SET_NULL)            │
+                                          │ status                            │
+                                          │ current_latitude/longitude     │
+                                          │ assigned_at / picked_up_at /   │
+                                          │   delivered_at                    │
+                                          └────────────────────────────┘
+
+┌────────────────────────────┐
+│  notifications_notification    │
+├────────────────────────────┤
+│ recipient_id (FK → users_user, │
+│   CASCADE)                        │
+│ title, body                       │
+│ notification_type                 │
+│ data (JSONB)                       │
+│ is_read, created_at                │
+└────────────────────────────┘
 ```
+
+`role='seller'` / `role='rider'` / `role='buyer'` constraints on FKs (e.g. `Product.seller`, `Order.buyer`) are enforced via DRF `limit_choices_to` and application logic, not a database-level `CHECK` constraint.
 
 ### Core Tables
 
-#### `users`
+#### `users_user` (extends Django's `AbstractUser`)
 | Column | Type | Description |
 |--------|------|-------------|
-| `id` | UUID (PK) | Unique user identifier (matches Supabase Auth UID) |
-| `email` | VARCHAR | User email (unique) |
-| `user_type` | ENUM | `buyer`, `seller`, `rider`, `admin` |
-| `full_name` | VARCHAR | Display name |
-| `phone` | VARCHAR | Phone number |
-| `created_at` | TIMESTAMP | Account creation timestamp |
+| `id` | INTEGER (PK, auto) | Plain auto-increment PK — **not** a UUID, and not tied to any Supabase Auth UID |
+| `username` | VARCHAR(150) | Django's built-in login username (unique) |
+| `email` | VARCHAR(254) | From `AbstractUser`; not unique by default |
+| `password` | VARCHAR | Hashed by Django's own auth system — there is no Supabase Auth integration |
+| `role` | VARCHAR(10) | `buyer`, `seller`, or `rider`. **There is no `admin` role** — admin/staff access uses Django's built-in `is_staff` / `is_superuser` flags instead |
+| `phone_number` | VARCHAR(15) | Not called `phone` |
+| `avatar_url` | VARCHAR (URL) | |
+| `is_verified` | BOOLEAN | |
+| `fcm_token` | VARCHAR(255) | Firebase Cloud Messaging push token |
+| `is_staff` / `is_superuser` | BOOLEAN | Inherited from `AbstractUser` |
+| `created_at` / `updated_at` | TIMESTAMP | |
 
-#### `sellers`
+#### `users_address`
 | Column | Type | Description |
 |--------|------|-------------|
-| `id` | UUID (PK) | Seller profile ID |
-| `user_id` | UUID (FK) | References `users.id` |
-| `business_name` | VARCHAR | Business display name |
-| `address` | TEXT | Business location |
-| `lat`, `lng` | DECIMAL | GPS coordinates |
-| `rating` | DECIMAL | Average rating (0-5) |
-| `verified` | BOOLEAN | Admin-verified status |
+| `id` | INTEGER (PK, auto) | |
+| `user_id` | INTEGER (FK → `users_user.id`) | `on_delete=CASCADE` |
+| `label` | VARCHAR(50) | e.g. "Home", "Office" |
+| `street` | VARCHAR(255) | |
+| `city` | VARCHAR(100) | |
+| `state` | VARCHAR(100) | |
+| `latitude` | DECIMAL(9,6), nullable | Named `latitude`, not `lat` |
+| `longitude` | DECIMAL(9,6), nullable | Named `longitude`, not `lng` |
+| `is_default` | BOOLEAN | |
 
-#### `products`
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | UUID (PK) | Product ID |
-| `seller_id` | UUID (FK) | References `sellers.id` |
-| `name` | VARCHAR | Product name |
-| `price` | DECIMAL | Bulk price |
-| `unit` | VARCHAR | e.g., "50kg bag", "½ crate" |
-| `stock_qty` | INTEGER | Available stock |
-| `category` | VARCHAR | e.g., "grains", "produce" |
-| `image_url` | TEXT | Supabase Storage URL |
+This is its own table, one-to-many from `users_user` — orders reference a row here (`delivery_address_id`), not an embedded address string or JSON blob.
 
-#### `orders`
+#### `sellers_sellerprofile`
 | Column | Type | Description |
 |--------|------|-------------|
-| `id` | UUID (PK) | Order ID |
-| `buyer_id` | UUID (FK) | References `users.id` |
-| `seller_id` | UUID (FK) | References `sellers.id` |
-| `status` | ENUM | `pending`, `accepted`, `preparing`, `ready`, `dispatched`, `delivered`, `cancelled` |
-| `total_amount` | DECIMAL | Total order amount |
-| `delivery_address` | JSONB | Full address object |
-| `created_at` | TIMESTAMP | Order placement time |
+| `id` | INTEGER (PK, auto) | |
+| `user_id` | INTEGER (FK → `users_user.id`, one-to-one) | `on_delete=CASCADE` |
+| `business_name` | VARCHAR(200) | |
+| `market_name` | VARCHAR(200) | |
+| `description` | TEXT, blank | |
+| `latitude` / `longitude` | DECIMAL(9,6), nullable | No flat `address` text field — location is coordinates only |
+| `rating` | DECIMAL(3,2), default 0.00 | |
+| `total_ratings` | INTEGER (unsigned), default 0 | |
+| `is_open` | BOOLEAN, default true | |
+| `opening_time` / `closing_time` | TIME, nullable | |
+| `created_at` / `updated_at` | TIMESTAMP | |
 
-#### `order_items`
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | UUID (PK) | Line item ID |
-| `order_id` | UUID (FK) | References `orders.id` |
-| `product_id` | UUID (FK) | References `products.id` |
-| `quantity` | INTEGER | Number of units |
-| `price_at_purchase` | DECIMAL | Snapshot of price at order time |
+There is no `verified` column here — seller verification, if used, would be `users_user.is_verified` on the linked user.
 
-#### `deliveries`
+#### `products_category`
 | Column | Type | Description |
 |--------|------|-------------|
-| `id` | UUID (PK) | Delivery ID |
-| `order_id` | UUID (FK) | References `orders.id` |
-| `rider_id` | UUID (FK) | References `users.id` |
-| `status` | ENUM | `assigned`, `picked_up`, `in_transit`, `delivered` |
-| `pickup_time` | TIMESTAMP | When rider picked up goods |
-| `delivered_at` | TIMESTAMP | When delivery completed |
+| `id` | INTEGER (PK, auto) | |
+| `name` | VARCHAR(100), unique | |
+| `slug` | VARCHAR (slug), unique | |
+| `icon_url` | VARCHAR (URL), blank | |
+
+Categories are a real table with an FK, not a free-text string on `products`.
+
+#### `products_product`
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | INTEGER (PK, auto) | |
+| `seller_id` | INTEGER (FK → `users_user.id`) | `on_delete=CASCADE`; must be a `role='seller'` user |
+| `category_id` | INTEGER (FK → `products_category.id`), nullable | `on_delete=SET_NULL` |
+| `name` | VARCHAR(200) | |
+| `description` | TEXT, blank | |
+| `price` | DECIMAL(12,2) | |
+| `unit` | VARCHAR(10) | `kg`, `bag`, `basket`, `piece`, `bundle` — not a free-text string like `"50kg bag"` |
+| `min_order_qty` | INTEGER (unsigned), default 1 | |
+| `stock_quantity` | INTEGER (unsigned), default 0 | Named `stock_quantity`, not `stock_qty` |
+| `image_url` | VARCHAR (URL), blank | Plain URL field — not necessarily Supabase Storage |
+| `is_available` | BOOLEAN, default true | Also doubles as the soft-delete flag; the API never hard-deletes products |
+| `created_at` / `updated_at` | TIMESTAMP | |
+
+#### `orders_order`
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | **UUID** (PK) | The one table that genuinely uses a UUID primary key (`default=uuid.uuid4`) |
+| `buyer_id` | INTEGER (FK → `users_user.id`) | `on_delete=CASCADE`; must be `role='buyer'` |
+| `seller_id` | INTEGER (FK → `users_user.id`) | `on_delete=CASCADE`; must be `role='seller'` — points at `users_user` directly, not at `sellers_sellerprofile` |
+| `delivery_address_id` | INTEGER (FK → `users_address.id`), nullable | `on_delete=SET_NULL` — a real row reference, not a JSONB address object |
+| `status` | VARCHAR(20) | `pending`, `confirmed`, `preparing`, `ready`, `in_transit`, `delivered`, `cancelled` |
+| `subtotal` | DECIMAL(12,2) | |
+| `delivery_fee` | DECIMAL(10,2), default 0 | |
+| `total` | DECIMAL(12,2) | Named `total`, not `total_amount` |
+| `notes` | TEXT, blank | |
+| `created_at` / `updated_at` | TIMESTAMP | |
+
+#### `orders_orderitem`
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | INTEGER (PK, auto) | |
+| `order_id` | UUID (FK → `orders_order.id`) | `on_delete=CASCADE` |
+| `product_id` | INTEGER (FK → `products_product.id`) | **`on_delete=PROTECT`** — a product with order history can't be hard-deleted at the DB level; the API soft-deletes it (`is_available=False`) instead |
+| `quantity` | INTEGER (unsigned) | |
+| `unit_price` | DECIMAL(12,2) | Named `unit_price`, not `price_at_purchase` |
+| `total_price` | DECIMAL(12,2) | Computed as `unit_price * quantity` in `Model.save()` — not a DB-generated column |
+
+#### `delivery_delivery`
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | INTEGER (PK, auto) | |
+| `order_id` | UUID (FK → `orders_order.id`, one-to-one) | `on_delete=CASCADE` |
+| `rider_id` | INTEGER (FK → `users_user.id`), nullable | `on_delete=SET_NULL`; must be `role='rider'` |
+| `status` | VARCHAR(20) | `pending`, `assigned`, `picked_up`, `delivered`, `failed` |
+| `current_latitude` / `current_longitude` | DECIMAL(9,6), nullable | |
+| `assigned_at` / `picked_up_at` / `delivered_at` | TIMESTAMP, nullable | |
+| `created_at` / `updated_at` | TIMESTAMP | |
+
+#### `delivery_riderprofile`
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | INTEGER (PK, auto) | |
+| `user_id` | INTEGER (FK → `users_user.id`, one-to-one) | `on_delete=CASCADE` |
+| `is_available` | BOOLEAN, default true | |
+| `current_latitude` / `current_longitude` | DECIMAL(9,6), nullable | |
+| `total_deliveries` | INTEGER (unsigned), default 0 | |
+| `rating` | DECIMAL(3,2), default 0.00 | |
+| `created_at` | TIMESTAMP | |
+
+This table wasn't in the original diagram at all — rider metadata is a distinct profile, mirroring `sellers_sellerprofile`.
+
+#### `notifications_notification`
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | INTEGER (PK, auto) | |
+| `recipient_id` | INTEGER (FK → `users_user.id`) | `on_delete=CASCADE` |
+| `title` | VARCHAR(255) | |
+| `body` | TEXT | |
+| `notification_type` | VARCHAR(30) | `order_placed`, `order_confirmed`, `order_preparing`, `order_ready`, `order_in_transit`, `order_delivered`, `order_cancelled`, `delivery_assigned`, `general` |
+| `data` | JSONB, default `{}` | Arbitrary structured payload for the client |
+| `is_read` | BOOLEAN, default false | |
+| `created_at` | TIMESTAMP | |
+
+This table also didn't appear in the original diagram.
 
 ### Row Level Security (RLS) Policies
 
-```sql
--- Users can only see their own data
-CREATE POLICY users_select_own ON users
-    FOR SELECT USING (auth.uid() = id);
+**This subsection previously listed several `CREATE POLICY` statements as if they were live and enforced. They weren't real — they referenced tables/columns (`users`, `sellers`, `stock_qty`) that don't exist in this schema.**
 
--- Buyers can see all active products
-CREATE POLICY products_select_active ON products
-    FOR SELECT USING (stock_qty > 0);
+The actual situation is more nuanced than "no RLS at all":
 
--- Sellers can only modify their own products
-CREATE POLICY products_modify_own ON products
-    FOR UPDATE USING (seller_id IN (
-        SELECT id FROM sellers WHERE user_id = auth.uid()
-    ));
+- A single real SQL file exists at [`backend/supabase/policies/orders_rls.sql`](./backend/supabase/policies/orders_rls.sql), defining three `SELECT` policies (buyers see their own orders, sellers see orders placed with them, riders see their assigned deliveries) using Supabase's `auth.uid()`.
+- That file is **not wired into anything**: it's not run by any Django migration, management command, or CI step, and nothing in the codebase references it. It also still targets the old fictional table/column names (`orders.buyer_id`, `deliveries.rider_id`) rather than the real `orders_order` / `delivery_delivery` tables, and it never issues `ALTER TABLE ... ENABLE ROW LEVEL SECURITY`, so even applied verbatim the policies would be inert.
+- More fundamentally, `auth.uid()` is populated by Supabase's PostgREST/GoTrue layer from a Supabase Auth JWT. This backend's Django app connects to Postgres directly (`django.db.backends.postgresql` in `backend/config/settings/*.py`) using its own database credentials and issues its own JWTs via `djangorestframework-simplejwt` — there's no Supabase Auth session for `auth.uid()` to read, so these policies wouldn't do anything meaningful even if enabled.
 
--- Buyers see only their own orders, sellers see orders for them
-CREATE POLICY orders_select_relevant ON orders
-    FOR SELECT USING (
-        buyer_id = auth.uid() OR
-        seller_id IN (SELECT id FROM sellers WHERE user_id = auth.uid())
-    );
+**Access control is actually enforced in the Django application layer**, via DRF permission classes and `get_queryset()` filtering — not Postgres RLS. See [`backend/apps/common/permissions.py`](./backend/apps/common/permissions.py) (`IsBuyer`, `IsSeller`, `IsRider`) and per-view filtering such as:
+
+```python
+# backend/apps/orders/views.py
+class BuyerOrderListCreateView(generics.ListCreateAPIView):
+    permission_classes = [IsBuyer]
+
+    def get_queryset(self):
+        return Order.objects.filter(buyer=self.request.user)
+
+class SellerOrderListView(generics.ListAPIView):
+    permission_classes = [IsSeller]
+
+    def get_queryset(self):
+        return Order.objects.filter(seller=self.request.user)
 ```
+
+Each role-scoped endpoint filters its queryset to `request.user` this way (buyers only ever see their own orders, sellers only see orders placed with them, riders only see deliveries assigned to them) rather than relying on database-level policies.
 
 ---
 
@@ -1018,7 +1134,7 @@ docker-compose exec backend pytest
 docker-compose exec backend pytest --cov=apps --cov-report=html
 
 # Run specific test file
-docker-compose exec backend pytest apps/orders/tests/test_views.py
+docker-compose exec backend pytest apps/orders/tests/test_state_machine.py
 
 # Run with verbose output
 docker-compose exec backend pytest -v
@@ -1048,21 +1164,24 @@ cd android
 
 ### Backend Deployment
 
-The backend is deployed via **GitHub Actions** to a cloud host (Render / Fly.io / Railway):
+The backend runs on **Render** (see `backend/render.yaml`), currently at
+`bulkbasket-backend.onrender.com`, deployed via Render's native Python
+runtime (`gunicorn config.wsgi:application`) rather than a Docker image.
+**GitHub Actions** (`.github/workflows/backend-ci.yml`) runs the test suite
+against every push/PR touching `backend/**`:
 
 ```yaml
-# Triggered on push to main branch
+# Triggered on push/PR touching backend/**
 on:
   push:
-    branches: [main]
+    paths: ['backend/**']
+  pull_request:
+    paths: ['backend/**']
 
 steps:
-  - Run tests
-  - Build Docker image
-  - Push to container registry
-  - Deploy to cloud host
-  - Run database migrations
-  - Health check
+  - Set up Python & install dependencies
+  - Run database migrations (against a CI Postgres service)
+  - Run pytest
 ```
 
 ### Android APK Distribution
@@ -1073,18 +1192,22 @@ steps:
 ### Environment Variables (Production)
 
 ```bash
-# Required environment variables
-DJANGO_SECRET_KEY=<strong-random-key>
-DJANGO_DEBUG=False
-DJANGO_ALLOWED_HOSTS=api.bulkbasket.com
-DATABASE_URL=postgresql://...
+# Required environment variables (see backend/config/settings/production.py
+# and backend/.env.example — DEBUG is hardcoded False in production, not
+# env-controlled)
+DJANGO_ENV=production
+SECRET_KEY=<strong-random-key>
+ALLOWED_HOSTS=bulkbasket-backend.onrender.com
+DB_NAME=...
+DB_USER=...
+DB_PASSWORD=...
+DB_HOST=...
+DB_PORT=6543
+REDIS_URL=redis://...
 SUPABASE_URL=https://xxxxx.supabase.co
 SUPABASE_KEY=...
-SUPABASE_JWT_SECRET=...
-REDIS_URL=redis://...
-CELERY_BROKER_URL=redis://...
-FCM_CREDENTIALS_PATH=/app/firebase-credentials.json
-SENTRY_DSN=https://...
+FCM_SERVER_KEY=...
+CORS_ALLOWED_ORIGINS=...
 ```
 
 ---

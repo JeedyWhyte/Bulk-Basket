@@ -30,6 +30,7 @@ bulkbasket/
 ├── 📄 API.md                       ← API documentation
 ├── 📄 Design.md                    ← Design system specification
 ├── 📄 STRUCTURE.md                 ← This file
+├── 📄 SECURITY.md                  ← Security policy & vulnerability reporting
 ├── 📄 LICENSE                      ← License terms
 ├── 📄 .gitignore                   ← Files Git should ignore
 ├── 📄 .editorconfig                ← Editor formatting rules
@@ -68,6 +69,7 @@ bulkbasket/
 | `API.md` | Complete REST API documentation | Backend Engineer |
 | `Design.md` | Design system, components, tokens | UI/UX Designer |
 | `STRUCTURE.md` | This file — explains repo structure | Project Lead |
+| `SECURITY.md` | Security policy, supported versions, how to report a vulnerability | Project Lead |
 
 ### Configuration Files
 
@@ -89,14 +91,14 @@ backend/
 │
 ├── 📄 manage.py                    ← Django management commands
 ├── 📄 Dockerfile                   ← Backend container definition
-├── 📄 docker-compose.dev.yml       ← Backend-specific dev compose
+├── 📄 Procfile                     ← Process types for deployment (Render/Heroku-style)
+├── 📄 render.yaml                  ← Render.com deployment config
+├── 📄 runtime.txt                  ← Python runtime version pin
 ├── 📄 requirements.txt             ← Python dependencies (production)
 ├── 📄 requirements-dev.txt         ← Dev dependencies (testing, linting)
-├── 📄 pyproject.toml               ← Python project config (black, isort)
 ├── 📄 .env.example                 ← Environment variables template
-├── 📄 .python-version              ← Python version (3.11)
 ├── 📄 pytest.ini                   ← Pytest configuration
-├── 📄 README.md                    ← Backend-specific setup
+├── 📄 bulkbasket-firebase-adminsdk.json ← Firebase Admin SDK credentials (gitignored)
 │
 ├── 📁 config/                      ← Django project configuration
 │   ├── __init__.py
@@ -120,15 +122,12 @@ backend/
 │   │   ├── serializers.py          ← DRF serializers
 │   │   ├── views.py                ← API views
 │   │   ├── urls.py                 ← App-level URLs
-│   │   ├── permissions.py          ← Permission classes
 │   │   ├── services.py             ← Business logic
 │   │   ├── admin.py                ← Django admin config
 │   │   ├── migrations/             ← DB migrations
 │   │   └── tests/                  ← App-specific tests
 │   │       ├── __init__.py
-│   │       ├── test_models.py
-│   │       ├── test_views.py
-│   │       └── test_services.py
+│   │       └── test_models.py
 │   │
 │   ├── 📁 products/                ← Product catalog
 │   │   ├── models.py               ← Product, Category models
@@ -136,8 +135,12 @@ backend/
 │   │   ├── views.py
 │   │   ├── urls.py
 │   │   ├── filters.py              ← Query filters
-│   │   ├── services.py
+│   │   ├── admin.py
+│   │   ├── migrations/
 │   │   └── tests/
+│   │       ├── __init__.py
+│   │       ├── test_models.py
+│   │       └── test_views.py
 │   │
 │   ├── 📁 sellers/                 ← Seller profiles
 │   │   ├── models.py               ← Seller model
@@ -145,7 +148,8 @@ backend/
 │   │   ├── views.py
 │   │   ├── urls.py
 │   │   ├── services.py             ← Nearby search logic
-│   │   └── tests/
+│   │   ├── migrations/             ← 0001–0003 (ratings, timestamps added)
+│   │   └── tests.py                ← Still a flat file (not yet split into a package)
 │   │
 │   ├── 📁 orders/                  ← Order processing
 │   │   ├── models.py               ← Order, OrderItem models
@@ -154,8 +158,13 @@ backend/
 │   │   ├── urls.py
 │   │   ├── state_machine.py        ← Order status transitions
 │   │   ├── services.py             ← Order creation, total calculation
-│   │   ├── tasks.py                ← Celery tasks (email, notifications)
+│   │   ├── migrations/
+│   │   │   ├── 0001_initial.py
+│   │   │   └── 0002_orderitem_product_protect.py  ← PROTECT FK on OrderItem.product
 │   │   └── tests/
+│   │       ├── __init__.py
+│   │       ├── test_state_machine.py
+│   │       └── test_services.py
 │   │
 │   ├── 📁 delivery/                ← Dispatch & tracking
 │   │   ├── models.py               ← Delivery model
@@ -163,8 +172,11 @@ backend/
 │   │   ├── views.py
 │   │   ├── urls.py
 │   │   ├── services.py             ← Rider assignment logic
-│   │   ├── tasks.py                ← Background dispatch tasks
+│   │   ├── admin.py
+│   │   ├── migrations/
 │   │   └── tests/
+│   │       ├── __init__.py
+│   │       └── test_services.py
 │   │
 │   ├── 📁 notifications/           ← FCM integration
 │   │   ├── models.py               ← Device, Notification models
@@ -172,8 +184,10 @@ backend/
 │   │   ├── views.py
 │   │   ├── urls.py
 │   │   ├── fcm.py                  ← FCM client wrapper
-│   │   ├── tasks.py                ← Send notification tasks
-│   │   └── tests/
+│   │   ├── services.py
+│   │   ├── admin.py
+│   │   ├── migrations/
+│   │   └── tests.py                ← Still a flat file (not yet split into a package)
 │   │
 │   └── 📁 common/                  ← Shared utilities
 │       ├── __init__.py
@@ -181,33 +195,16 @@ backend/
 │       ├── responses.py            ← Standardized response helpers
 │       ├── pagination.py           ← Custom pagination classes
 │       ├── permissions.py          ← Base permission classes
-│       ├── middleware.py           ← Custom middleware (logging, JWT)
-│       └── utils.py                ← Helper functions
+│       └── tests/
+│           ├── __init__.py
+│           └── test_exceptions.py
 │
-├── 📁 supabase/                    ← Supabase configuration
-│   ├── migrations/                 ← SQL migration files
-│   │   ├── 001_initial_schema.sql
-│   │   ├── 002_add_indexes.sql
-│   │   └── 003_seed_categories.sql
-│   ├── policies/                   ← Row Level Security policies
-│   │   ├── users_rls.sql
-│   │   ├── products_rls.sql
-│   │   └── orders_rls.sql
-│   └── functions/                  ← Database functions
-│       └── search_nearby_sellers.sql
-│
-├── 📁 tests/                       ← Integration & E2E tests
-│   ├── __init__.py
-│   ├── conftest.py                 ← Pytest fixtures
-│   ├── test_auth_flow.py
-│   ├── test_order_flow.py
-│   └── factories/                  ← Factory Boy factories
-│       ├── user_factory.py
-│       └── product_factory.py
-│
-└── 📁 static/                      ← Static files (admin assets)
-    └── admin/
+└── 📁 supabase/                    ← Supabase configuration
+    └── policies/                   ← Row Level Security policies
+        └── orders_rls.sql
 ```
+
+> **Note:** No app currently has a `tasks.py`/Celery task file, `middleware.py`, or `utils.py` — `config/celery.py` exists for future use but nothing has been wired to it yet. There is also no top-level `backend/tests/` (integration tests) or `backend/static/` directory yet.
 
 ### Backend Folder Purposes
 
@@ -219,14 +216,13 @@ backend/
 | `apps/<app>/serializers.py` | Request/response data validation |
 | `apps/<app>/views.py` | API endpoint handlers |
 | `apps/<app>/services.py` | Business logic (kept out of views) |
-| `apps/<app>/tasks.py` | Async background jobs (Celery) |
-| `apps/<app>/tests/` | Unit tests for that app |
-| `supabase/` | All Supabase-specific SQL and policies |
-| `tests/` | Cross-app integration tests |
+| `apps/<app>/tasks.py` | Async background jobs (Celery) — convention only; no app has adopted this yet |
+| `apps/<app>/tests/` | Unit tests for that app (some apps still use a flat `tests.py`; see tree above) |
+| `supabase/` | Supabase-specific SQL (currently just RLS policies) |
 
 ### Django App Pattern
 
-Each app follows the **same structure** for consistency:
+Each app follows roughly the **same structure** for consistency (using `orders/` as the fullest example):
 
 ```
 apps/orders/
@@ -235,10 +231,13 @@ apps/orders/
 ├── views.py          ← HTTP endpoint handlers (thin)
 ├── services.py       ← Business logic (fat)
 ├── urls.py           ← URL routing
-├── permissions.py    ← Who can do what
-├── tasks.py          ← Async jobs
+├── state_machine.py  ← Order status transitions
+├── admin.py          ← Django admin config
+├── migrations/       ← DB migrations
 └── tests/            ← Tests mirror the structure above
 ```
+
+> Not every app has every file — e.g. `permissions.py` and `tasks.py` are conventions defined but not yet used by any app; `sellers/` and `notifications/` still keep tests in a single flat `tests.py` instead of a `tests/` package.
 
 > **Rule of thumb:** Views should be thin. Move logic into `services.py`.
 
@@ -255,9 +254,11 @@ android/
 ├── 📄 settings.gradle.kts          ← Module declarations
 ├── 📄 gradle.properties            ← Gradle properties
 ├── 📄 local.properties             ← Local config (gitignored)
-├── 📄 README.md                    ← Android-specific setup
+├── 📄 gradlew / gradlew.bat        ← Gradle wrapper scripts
 │
-├── 📁 gradle/                      ← Gradle wrapper
+├── 📁 gradle/                      ← Gradle wrapper & version catalog
+│   ├── libs.versions.toml          ← Centralized dependency versions
+│   ├── gradle-daemon-jvm.properties
 │   └── wrapper/
 │
 ├── 📁 app/                         ← Main Android module
@@ -276,109 +277,122 @@ android/
 │       │   │   │   └── MainActivity.kt
 │       │   │   │
 │       │   │   ├── 📁 di/                 ← Hilt modules
-│       │   │   │   ├── NetworkModule.kt
+│       │   │   │   ├── AppModule.kt
 │       │   │   │   ├── DatabaseModule.kt
-│       │   │   │   ├── RepositoryModule.kt
-│       │   │   │   └── SupabaseModule.kt
+│       │   │   │   ├── NetworkModule.kt
+│       │   │   │   └── RepositoryModule.kt
 │       │   │   │
 │       │   │   ├── 📁 data/               ← Data layer
 │       │   │   │   ├── 📁 remote/         ← Network/API
 │       │   │   │   │   ├── api/           ← Retrofit interfaces
 │       │   │   │   │   │   ├── AuthApi.kt
-│       │   │   │   │   │   ├── ProductsApi.kt
+│       │   │   │   │   │   ├── DeliveryApi.kt
+│       │   │   │   │   │   ├── NotificationsApi.kt
 │       │   │   │   │   │   ├── OrdersApi.kt
-│       │   │   │   │   │   └── DeliveryApi.kt
+│       │   │   │   │   │   ├── ProductsApi.kt
+│       │   │   │   │   │   └── SellersApi.kt
 │       │   │   │   │   ├── dto/           ← Data Transfer Objects
-│       │   │   │   │   │   ├── ProductDto.kt
-│       │   │   │   │   │   └── OrderDto.kt
+│       │   │   │   │   │   ├── DeliveryDtos.kt
+│       │   │   │   │   │   ├── NotificationDtos.kt
+│       │   │   │   │   │   ├── OrderDtos.kt
+│       │   │   │   │   │   ├── ProductDtos.kt
+│       │   │   │   │   │   ├── SellerDtos.kt
+│       │   │   │   │   │   └── UserDtos.kt
 │       │   │   │   │   └── interceptors/  ← OkHttp interceptors
 │       │   │   │   │       ├── AuthInterceptor.kt
-│       │   │   │   │       └── LoggingInterceptor.kt
+│       │   │   │   │       └── TokenAuthenticator.kt   ← Refreshes/retries on 401
 │       │   │   │   │
 │       │   │   │   ├── 📁 local/          ← Room database
-│       │   │   │   │   ├── BulkBasketDatabase.kt
-│       │   │   │   │   ├── dao/           ← Data Access Objects
-│       │   │   │   │   │   ├── ProductDao.kt
-│       │   │   │   │   │   └── OrderDao.kt
-│       │   │   │   │   ├── entity/        ← Room entities
-│       │   │   │   │   │   ├── ProductEntity.kt
-│       │   │   │   │   │   └── OrderEntity.kt
-│       │   │   │   │   └── converters/    ← Type converters
-│       │   │   │   │       └── DateConverter.kt
+│       │   │   │   │   └── BulkBasketDatabase.kt   ← Scaffolded only; no DAOs/entities/converters yet
 │       │   │   │   │
 │       │   │   │   ├── 📁 repository/     ← Repositories (single source)
 │       │   │   │   │   ├── AuthRepository.kt
-│       │   │   │   │   ├── ProductRepository.kt
+│       │   │   │   │   ├── DeliveryRepository.kt
+│       │   │   │   │   ├── NotificationRepository.kt
 │       │   │   │   │   ├── OrderRepository.kt
-│       │   │   │   │   └── DeliveryRepository.kt
+│       │   │   │   │   └── ProductRepository.kt
 │       │   │   │   │
 │       │   │   │   └── 📁 mappers/        ← DTO ↔ Domain mappers
+│       │   │   │       ├── AddressMapper.kt
+│       │   │   │       ├── CategoryMapper.kt
+│       │   │   │       ├── DeliveryMapper.kt
+│       │   │   │       ├── NotificationMapper.kt
+│       │   │   │       ├── OrderMapper.kt
 │       │   │   │       ├── ProductMapper.kt
-│       │   │   │       └── OrderMapper.kt
+│       │   │   │       ├── RiderMapper.kt
+│       │   │   │       ├── SellerMapper.kt
+│       │   │   │       └── UserMapper.kt
 │       │   │   │
 │       │   │   ├── 📁 domain/             ← Domain layer
 │       │   │   │   ├── 📁 model/          ← Domain models
-│       │   │   │   │   ├── User.kt
-│       │   │   │   │   ├── Product.kt
+│       │   │   │   │   ├── Address.kt
+│       │   │   │   │   ├── CartItem.kt
+│       │   │   │   │   ├── Category.kt
+│       │   │   │   │   ├── Delivery.kt
+│       │   │   │   │   ├── Notification.kt
 │       │   │   │   │   ├── Order.kt
+│       │   │   │   │   ├── Product.kt
+│       │   │   │   │   ├── RiderProfile.kt
 │       │   │   │   │   ├── Seller.kt
-│       │   │   │   │   └── Delivery.kt
-│       │   │   │   │
-│       │   │   │   ├── 📁 usecase/        ← Use cases (business logic)
-│       │   │   │   │   ├── PlaceOrderUseCase.kt
-│       │   │   │   │   ├── GetNearbySellersUseCase.kt
-│       │   │   │   │   └── AcceptDeliveryUseCase.kt
+│       │   │   │   │   └── User.kt
 │       │   │   │   │
 │       │   │   │   └── 📁 repository/     ← Repository interfaces
 │       │   │   │       ├── IAuthRepository.kt
-│       │   │   │       └── IOrderRepository.kt
+│       │   │   │       ├── IDeliveryRepository.kt
+│       │   │   │       ├── INotificationRepository.kt
+│       │   │   │       ├── IOrderRepository.kt
+│       │   │   │       └── IProductRepository.kt
+│       │   │   │       (no domain/usecase/ yet — business logic still lives in repositories/ViewModels)
 │       │   │   │
 │       │   │   ├── 📁 ui/                 ← UI layer (Compose)
 │       │   │   │   │
 │       │   │   │   ├── 📁 theme/          ← Design system
-│       │   │   │   │   ├── Theme.kt
 │       │   │   │   │   ├── Colors.kt
-│       │   │   │   │   ├── Typography.kt
-│       │   │   │   │   ├── Shapes.kt
-│       │   │   │   │   └── Spacing.kt
+│       │   │   │   │   ├── Dimensions.kt
+│       │   │   │   │   ├── Fonts.kt
+│       │   │   │   │   ├── Theme.kt
+│       │   │   │   │   ├── ThemeViewModel.kt   ← Light/dark toggle state
+│       │   │   │   │   ├── Type.kt
+│       │   │   │   │   └── Typography.kt
 │       │   │   │   │
 │       │   │   │   ├── 📁 common/         ← Shared composables
 │       │   │   │   │   ├── components/    ← Reusable components
-│       │   │   │   │   │   ├── BulkButton.kt
-│       │   │   │   │   │   ├── BulkTextField.kt
-│       │   │   │   │   │   ├── ProductCard.kt
-│       │   │   │   │   │   ├── SellerCard.kt
-│       │   │   │   │   │   ├── LoadingIndicator.kt
-│       │   │   │   │   │   └── EmptyState.kt
-│       │   │   │   │   ├── navigation/    ← App navigation
-│       │   │   │   │   │   ├── BulkBasketNavHost.kt
-│       │   │   │   │   │   ├── Routes.kt
-│       │   │   │   │   │   └── BottomNav.kt
-│       │   │   │   │   └── extensions/    ← Kotlin extensions
-│       │   │   │   │       ├── ModifierExt.kt
-│       │   │   │   │       └── FlowExt.kt
+│       │   │   │   │   │   ├── BulkBasketCard.kt
+│       │   │   │   │   │   ├── CurvedTopAppBar.kt
+│       │   │   │   │   │   └── LoadingScreen.kt
+│       │   │   │   │   └── navigation/    ← App navigation
+│       │   │   │   │       ├── BulkBasketNavHost.kt
+│       │   │   │   │       └── Routes.kt
 │       │   │   │   │
 │       │   │   │   ├── 📁 auth/           ← Authentication flow
 │       │   │   │   │   ├── login/
 │       │   │   │   │   │   ├── LoginScreen.kt
 │       │   │   │   │   │   └── LoginViewModel.kt
-│       │   │   │   │   ├── signup/
-│       │   │   │   │   │   ├── SignupScreen.kt
-│       │   │   │   │   │   └── SignupViewModel.kt
-│       │   │   │   │   └── splash/
-│       │   │   │   │       └── SplashScreen.kt
+│       │   │   │   │   └── signup/
+│       │   │   │   │       ├── SignupScreen.kt
+│       │   │   │   │       └── SignupViewModel.kt
+│       │   │   │   │
+│       │   │   │   ├── 📁 splash/         ← Splash flow (sibling of auth/, not nested under it)
+│       │   │   │   │   ├── SplashScreen.kt
+│       │   │   │   │   └── SplashViewModel.kt
 │       │   │   │   │
 │       │   │   │   ├── 📁 buyer/          ← Buyer-specific screens
+│       │   │   │   │   ├── BuyerShellScreen.kt    ← Bottom-nav host Scaffold for the buyer role
 │       │   │   │   │   ├── home/
 │       │   │   │   │   │   ├── HomeScreen.kt
-│       │   │   │   │   │   ├── HomeViewModel.kt
-│       │   │   │   │   │   └── HomeState.kt
+│       │   │   │   │   │   └── HomeViewModel.kt
 │       │   │   │   │   ├── search/
-│       │   │   │   │   │   ├── SearchScreen.kt
-│       │   │   │   │   │   └── SearchViewModel.kt
-│       │   │   │   │   ├── seller_detail/
+│       │   │   │   │   │   └── BrowseScreen.kt
+│       │   │   │   │   ├── category/            ← Category browsing (new)
+│       │   │   │   │   │   ├── CategoryEmojis.kt
+│       │   │   │   │   │   ├── CategoryScreen.kt
+│       │   │   │   │   │   └── CategoryViewModel.kt
+│       │   │   │   │   ├── sellerdetail/
 │       │   │   │   │   │   ├── SellerDetailScreen.kt
 │       │   │   │   │   │   └── SellerDetailViewModel.kt
+│       │   │   │   │   ├── productdetail/       ← Product detail (new)
+│       │   │   │   │   │   ├── ProductDetailScreen.kt
+│       │   │   │   │   │   └── ProductDetailViewModel.kt
 │       │   │   │   │   ├── cart/
 │       │   │   │   │   │   ├── CartScreen.kt
 │       │   │   │   │   │   └── CartViewModel.kt
@@ -386,84 +400,72 @@ android/
 │       │   │   │   │   │   ├── CheckoutScreen.kt
 │       │   │   │   │   │   └── CheckoutViewModel.kt
 │       │   │   │   │   ├── orders/
-│       │   │   │   │   │   ├── OrdersListScreen.kt
-│       │   │   │   │   │   ├── OrderDetailScreen.kt
-│       │   │   │   │   │   └── OrderViewModel.kt
-│       │   │   │   │   └── tracking/
-│       │   │   │   │       ├── TrackingScreen.kt
-│       │   │   │   │       └── TrackingViewModel.kt
+│       │   │   │   │   │   ├── BuyerOrdersScreen.kt
+│       │   │   │   │   │   └── BuyerOrdersViewModel.kt
+│       │   │   │   │   ├── profile/             ← Buyer profile (new)
+│       │   │   │   │   │   ├── ProfileScreen.kt
+│       │   │   │   │   │   └── ProfileViewModel.kt
+│       │   │   │   │   └── common/              ← Buyer-scoped shared composables
+│       │   │   │   │       ├── BuyerBottomNav.kt
+│       │   │   │   │       ├── ProductCard.kt
+│       │   │   │   │       └── SellerCard.kt
 │       │   │   │   │
 │       │   │   │   ├── 📁 seller/         ← Seller-specific screens
+│       │   │   │   │   ├── SellerShellScreen.kt   ← Bottom-nav host Scaffold for the seller role
 │       │   │   │   │   ├── dashboard/
 │       │   │   │   │   │   ├── SellerDashboardScreen.kt
-│       │   │   │   │   │   └── DashboardViewModel.kt
+│       │   │   │   │   │   └── SellerDashboardViewModel.kt
 │       │   │   │   │   ├── inventory/
 │       │   │   │   │   │   ├── InventoryScreen.kt
-│       │   │   │   │   │   ├── AddProductScreen.kt
 │       │   │   │   │   │   └── InventoryViewModel.kt
-│       │   │   │   │   └── orders/
-│       │   │   │   │       ├── SellerOrdersScreen.kt
-│       │   │   │   │       └── SellerOrdersViewModel.kt
+│       │   │   │   │   ├── orders/
+│       │   │   │   │   │   └── SellerOrdersScreen.kt    ← No dedicated ViewModel yet
+│       │   │   │   │   ├── profile/               ← Seller profile (new)
+│       │   │   │   │   │   ├── SellerProfileScreen.kt
+│       │   │   │   │   │   └── SellerProfileViewModel.kt
+│       │   │   │   │   └── common/                ← Seller-scoped shared composables
+│       │   │   │   │       ├── OrderCard.kt
+│       │   │   │   │       ├── OrderStatusChip.kt
+│       │   │   │   │       └── SellerBottomNav.kt
 │       │   │   │   │
-│       │   │   │   └── 📁 rider/          ← Rider-specific screens
-│       │   │   │       ├── jobs/
-│       │   │   │       │   ├── JobsListScreen.kt
-│       │   │   │       │   └── JobsViewModel.kt
-│       │   │   │       ├── active_delivery/
-│       │   │   │       │   ├── ActiveDeliveryScreen.kt
-│       │   │   │       │   └── ActiveDeliveryViewModel.kt
-│       │   │   │       └── earnings/
-│       │   │   │           ├── EarningsScreen.kt
-│       │   │   │           └── EarningsViewModel.kt
+│       │   │   │   ├── 📁 rider/          ← Rider-specific screens
+│       │   │   │   │   ├── jobs/
+│       │   │   │   │   │   ├── RiderJobsScreen.kt
+│       │   │   │   │   │   └── RiderJobsViewModel.kt
+│       │   │   │   │   ├── activedelivery/
+│       │   │   │   │   │   ├── ActiveDeliveryScreen.kt
+│       │   │   │   │   │   └── ActiveDeliveryViewModel.kt
+│       │   │   │   │   ├── profile/               ← Replaces the old "earnings/" concept
+│       │   │   │   │   │   ├── RiderProfileScreen.kt
+│       │   │   │   │   │   └── RiderProfileViewModel.kt
+│       │   │   │   │   └── common/
+│       │   │   │   │       └── DeliveryCard.kt
+│       │   │   │   │
+│       │   │   │   └── 📁 shared/         ← Screens shared across roles (new top-level ui category)
+│       │   │   │       └── notifications/
+│       │   │   │           ├── NotificationsScreen.kt
+│       │   │   │           └── NotificationsViewModel.kt
 │       │   │   │
 │       │   │   ├── 📁 utils/              ← Utilities
 │       │   │   │   ├── Constants.kt
-│       │   │   │   ├── DateFormatter.kt
-│       │   │   │   ├── CurrencyFormatter.kt
-│       │   │   │   ├── PreferencesManager.kt
-│       │   │   │   └── NetworkResult.kt    ← Sealed class for results
+│       │   │   │   ├── NetworkResult.kt    ← Sealed class for results
+│       │   │   │   └── PreferencesManager.kt
 │       │   │   │
 │       │   │   └── 📁 service/            ← Background services
-│       │   │       ├── FcmService.kt       ← Push notifications
-│       │   │       └── LocationService.kt  ← GPS tracking (rider)
+│       │   │       └── FcmService.kt       ← Push notifications (no LocationService.kt yet)
 │       │   │
 │       │   └── 📁 res/                    ← Android resources
 │       │       ├── drawable/               ← Vector drawables
-│       │       │   ├── ic_logo.xml
-│       │       │   ├── ic_home.xml
-│       │       │   └── btn_primary_bg.xml
-│       │       ├── values/                 ← Resource values
-│       │       │   ├── colors.xml
-│       │       │   ├── strings.xml
-│       │       │   ├── dimens.xml
-│       │       │   ├── styles.xml
-│       │       │   └── themes.xml
-│       │       ├── values-night/           ← Dark theme overrides
-│       │       │   └── colors.xml
-│       │       ├── font/                   ← Custom fonts
-│       │       │   ├── inter_regular.ttf
-│       │       │   └── sora_bold.ttf
-│       │       └── mipmap-*/               ← App icons (various densities)
+│       │       ├── values/                 ← Resource values (colors, strings, themes, etc.)
+│       │       ├── xml/                    ← Backup/data-extraction rules
+│       │       └── mipmap-*/               ← App icons (various densities; no values-night/ or font/ yet)
 │       │
-│       ├── 📁 test/                       ← Unit tests
-│       │   └── java/com/bulkbasket/
-│       │       ├── data/
-│       │       │   └── repository/
-│       │       └── ui/
-│       │           └── viewmodels/
+│       ├── 📁 test/                       ← Unit tests (directory scaffolded, currently empty)
 │       │
-│       └── 📁 androidTest/                ← Instrumented tests
-│           └── java/com/bulkbasket/
-│               ├── ui/                    ← Espresso UI tests
-│               └── database/              ← Room tests
-│
-└── 📁 design/                              ← Design assets reference
-    ├── figma_export/
-    │   ├── icons/
-    │   ├── illustrations/
-    │   └── screenshots/
-    └── README.md                          ← How to use design assets
+│       └── 📁 androidTest/                ← Instrumented tests (directory scaffolded, currently empty)
 ```
+
+> There is no `android/design/` folder — design assets reference lives only at the repo root (`/design/`, see Top-Level Overview).
 
 ### Android Layer Architecture
 
@@ -500,33 +502,34 @@ The Android app follows **Clean Architecture** with three layers:
 | `di/` | Hilt modules — dependency injection configuration |
 | `data/` | Data layer: API, database, repositories |
 | `data/remote/` | Network calls (Retrofit, DTOs, interceptors) |
-| `data/local/` | Room database (entities, DAOs, type converters) |
+| `data/local/` | Room database — currently just the `BulkBasketDatabase.kt` scaffold; no DAOs/entities/converters yet |
 | `data/repository/` | Repository implementations |
-| `data/mappers/` | Convert between DTOs ↔ Entities ↔ Domain models |
+| `data/mappers/` | Convert between DTOs ↔ Domain models |
 | `domain/` | Pure business logic, no Android dependencies |
 | `domain/model/` | Domain models used throughout the app |
-| `domain/usecase/` | Single-responsibility business operations |
-| `domain/repository/` | Repository interfaces (implementations in data/) |
+| `domain/repository/` | Repository interfaces (implementations in data/) — no `domain/usecase/` layer yet |
 | `ui/` | Compose screens, ViewModels, theme |
-| `ui/theme/` | Design system: colors, typography, spacing |
-| `ui/common/` | Reusable UI components shared across screens |
+| `ui/theme/` | Design system: colors, typography, dimensions, fonts |
+| `ui/common/` | Reusable UI components and navigation shared across screens |
 | `ui/auth/` | Login/signup screens |
+| `ui/splash/` | Splash screen (sibling of `ui/auth/`, not nested inside it) |
 | `ui/buyer/` | Buyer app screens |
 | `ui/seller/` | Seller app screens |
 | `ui/rider/` | Rider app screens |
-| `utils/` | Helper classes (formatters, constants) |
-| `service/` | Android services (FCM, location) |
-| `res/` | Android resources (drawables, colors, strings) |
+| `ui/shared/` | Screens shared across roles (e.g. notifications) |
+| `utils/` | Helper classes (constants, network result wrapper, preferences) |
+| `service/` | Android services (currently just FCM) |
+| `res/` | Android resources (drawables, values, xml, mipmaps) |
 
 ### Screen Pattern
 
-Each screen follows the **same structure**:
+Each screen generally follows the **same structure** (state is often kept inline in the ViewModel rather than split into separate files):
 
 ```
 ui/buyer/cart/
 ├── CartScreen.kt        ← @Composable function
 ├── CartViewModel.kt     ← Hilt @ViewModel
-├── CartState.kt         ← UI state data class
+├── CartState.kt         ← UI state data class (optional — often inlined in the ViewModel)
 └── CartEvent.kt         ← User events (optional)
 ```
 
@@ -536,74 +539,17 @@ ui/buyer/cart/
 
 ## 📚 Documentation Structure
 
-Detailed documentation lives in `/docs/`.
+Detailed documentation lives in `/docs/`. In practice this folder is much flatter today than the aspirational layout below might suggest — it currently holds just three files:
 
 ```
 docs/
 │
-├── 📄 README.md                     ← Documentation index
-│
-├── 📁 architecture/                 ← Architecture docs
-│   ├── overview.md                  ← High-level architecture
-│   ├── android-architecture.md      ← Clean Architecture details
-│   ├── backend-architecture.md      ← Django structure
-│   ├── data-flow.md                 ← How data moves through the system
-│   └── diagrams/                    ← Architecture diagrams
-│       ├── system-overview.png
-│       ├── android-layers.png
-│       └── order-flow.png
-│
-├── 📁 api/                          ← API documentation
-│   ├── README.md                    ← API overview
-│   ├── authentication.md            ← Auth flow details
-│   ├── endpoints.md                 ← Endpoint catalog
-│   └── postman/                     ← Postman collection
-│       └── BulkBasket.postman_collection.json
-│
-├── 📁 database/                     ← Database documentation
-│   ├── schema.md                    ← Schema documentation
-│   ├── erd.png                      ← Entity Relationship Diagram
-│   ├── rls-policies.md              ← Row Level Security explained
-│   └── migrations.md                ← How to write migrations
-│
-├── 📁 deployment/                   ← Deployment guides
-│   ├── backend-deployment.md        ← Deploy Django to cloud
-│   ├── android-release.md           ← Build and sign APK
-│   ├── ci-cd.md                     ← GitHub Actions workflows
-│   └── environment-setup.md         ← Env vars reference
-│
-├── 📁 development/                  ← Developer guides
-│   ├── getting-started.md           ← First-day setup
-│   ├── local-development.md         ← Running the project locally
-│   ├── debugging.md                 ← How to debug issues
-│   ├── testing.md                   ← How to write/run tests
-│   └── troubleshooting.md           ← Common issues + solutions
-│
-├── 📁 design/                       ← Design documentation
-│   ├── design-system.md             ← Component specs (links to Design.md)
-│   ├── user-flows.md                ← User journey diagrams
-│   ├── wireframes/                  ← Sketch/mockup exports
-│   └── screenshots/                 ← App screenshots
-│
-├── 📁 team/                         ← Team documentation
-│   ├── roles.md                     ← Detailed role descriptions
-│   ├── workflow.md                  ← How we work together
-│   ├── meetings.md                  ← Meeting templates
-│   └── retrospectives/              ← Sprint retros
-│       ├── 2026-06-week-1.md
-│       └── 2026-06-week-2.md
-│
-├── 📁 academic/                     ← Academic submission docs
-│   ├── proposal.md                  ← Project proposal
-│   ├── progress-reports/            ← Weekly progress
-│   ├── final-report.md              ← Final academic report
-│   └── presentation.pdf             ← Defense slides
-│
-└── 📁 user-guides/                  ← End-user documentation
-    ├── buyer-guide.md               ← How to use as a buyer
-    ├── seller-guide.md              ← How to use as a seller
-    └── rider-guide.md               ← How to use as a rider
+├── 📄 API.md            ← API reference (mirrors/expands on the root API.md)
+├── 📄 CONTRIBUTING.md   ← Contribution guidelines
+└── 📄 SETUP.md          ← Environment & local setup instructions
 ```
+
+The subdivided structure (`architecture/`, `api/`, `database/`, `deployment/`, `development/`, `design/`, `team/`, `academic/`, `user-guides/`, etc.) described in earlier drafts of this document has not been built out — treat it as a future target, not current state, until those folders actually exist.
 
 ---
 
@@ -616,19 +562,14 @@ docs/
 │
 ├── 📁 workflows/                    ← GitHub Actions CI/CD
 │   ├── backend-ci.yml               ← Run on backend PRs
-│   ├── android-ci.yml               ← Run on Android PRs
-│   ├── deploy-staging.yml           ← Auto-deploy to staging
-│   └── deploy-production.yml        ← Deploy to production
+│   └── android-ci.yml               ← Run on Android PRs
 │
-├── 📁 ISSUE_TEMPLATE/               ← Issue templates
-│   ├── bug_report.md
-│   ├── feature_request.md
-│   └── config.yml
-│
-├── 📄 PULL_REQUEST_TEMPLATE.md      ← PR template
-├── 📄 CODEOWNERS                    ← Auto-assign reviewers
-└── 📄 dependabot.yml                ← Dependency updates
+└── 📁 ISSUE_TEMPLATE/               ← Issue templates
+    ├── bug_report.md
+    └── feature_request.md
 ```
+
+> `deploy-staging.yml`/`deploy-production.yml` workflows, `PULL_REQUEST_TEMPLATE.md`, `CODEOWNERS`, and `dependabot.yml` don't exist yet — CI currently only runs backend and Android checks on PRs.
 
 ### Root Configuration Files
 
@@ -637,12 +578,10 @@ bulkbasket/
 │
 ├── 📄 .gitignore                   ← What Git ignores
 ├── 📄 .editorconfig                ← Editor settings standardization
-├── 📄 .pre-commit-config.yaml      ← Pre-commit hooks (linting)
-├── 📄 docker-compose.yml           ← Local dev orchestration
-├── 📄 docker-compose.test.yml      ← Test environment
-├── 📄 .env.example                 ← Environment variables template
-└── 📄 .nvmrc                       ← Node version (for tooling)
+└── 📄 docker-compose.yml           ← Local dev orchestration
 ```
+
+> `.pre-commit-config.yaml`, `docker-compose.test.yml`, a root-level `.env.example`, and `.nvmrc` don't exist in the repo today (there is a `.env.example` under `backend/`, documented in the Backend Structure section).
 
 ### Sample `.gitignore`
 
@@ -692,25 +631,17 @@ Utility scripts live in `/scripts/`.
 ```
 scripts/
 │
-├── 📄 README.md                     ← Scripts documentation
-│
 ├── 📁 dev/                          ← Development scripts
-│   ├── setup.sh                     ← Full project setup
-│   ├── reset-db.sh                  ← Reset local DB
-│   ├── seed-db.py                   ← Seed sample data
-│   ├── run-tests.sh                 ← Run all tests
-│   └── lint-all.sh                  ← Lint all code
+│   └── start.ps1                    ← PowerShell dev startup script (Windows-first tooling)
 │
 ├── 📁 deploy/                       ← Deployment scripts
-│   ├── deploy-backend.sh
-│   ├── build-android-release.sh
-│   └── upload-apk.sh
+│   └── README.md                    ← Placeholder — no deploy scripts committed yet
 │
 └── 📁 admin/                        ← Admin/ops scripts
-    ├── backup-db.sh
-    ├── create-superuser.py
-    └── send-test-notification.py
+    └── create_test_data.py          ← Seeds sample data for local testing
 ```
+
+> The scripts tree is much smaller than earlier drafts implied — there's no top-level `scripts/README.md`, and none of `reset-db.sh`, `seed-db.py`, `run-tests.sh`, `lint-all.sh`, `deploy-backend.sh`, `build-android-release.sh`, `upload-apk.sh`, `backup-db.sh`, `create-superuser.py`, or `send-test-notification.py` exist. `dev/` scripts are PowerShell (`.ps1`), not bash, matching the Windows-based dev setup.
 
 ---
 
@@ -936,8 +867,8 @@ When the structure changes significantly:
 
 ---
 
-**Repository Structure Version:** 1.0  
-**Last Updated:** June 2026  
+**Repository Structure Version:** 1.1  
+**Last Updated:** September 2026  
 **Maintained by:** Project Lead
 
 ---

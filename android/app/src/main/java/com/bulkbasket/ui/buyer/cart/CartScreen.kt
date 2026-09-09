@@ -11,20 +11,20 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -35,8 +35,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -44,6 +42,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.background
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -53,11 +52,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.bulkbasket.ui.theme.Dimensions
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CartScreen(
     onBack: () -> Unit,
     onCheckout: () -> Unit,
+    onOrdersClick: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: CartViewModel = hiltViewModel(),
 ) {
@@ -72,28 +71,48 @@ fun CartScreen(
     }
 
     Scaffold(
+        modifier = modifier,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = {
+            // Matches background — same as BottomNav theme
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.background)
+                    .statusBarsPadding()
+                    .padding(
+                        horizontal = Dimensions.paddingLarge,
+                        vertical = 4.dp,
+                    ),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column {
                     Text(
-                        text = "Cart (${state.itemCount})",
+                        text = "My Cart",
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground,
                     )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = MaterialTheme.colorScheme.onPrimary,
+                    if (state.items.isNotEmpty()) {
+                        Text(
+                            text = "${state.itemCount} item${if (state.itemCount > 1) "s" else ""}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
-            )
+                }
+
+                // Orders icon on the right
+                IconButton(onClick = onOrdersClick) {
+                    Icon(
+                        imageVector = Icons.Filled.Receipt,
+                        contentDescription = "My Orders",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+            }
         },
         snackbarHost = {
             SnackbarHost(snackbarHostState) { data ->
@@ -101,10 +120,11 @@ fun CartScreen(
             }
         },
         bottomBar = {
+            // Only show bottom bar when cart has items
             if (state.items.isNotEmpty()) {
                 Surface(
-                    shadowElevation = 8.dp,
                     color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 8.dp,
                 ) {
                     Column(
                         modifier = Modifier
@@ -123,9 +143,12 @@ fun CartScreen(
                             Text(
                                 text = "₦${"%.2f".format(state.subtotal)}",
                                 style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
                             )
                         }
+
                         Spacer(modifier = Modifier.height(4.dp))
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -138,19 +161,24 @@ fun CartScreen(
                             Text(
                                 text = "₦${"%.2f".format(state.deliveryFee)}",
                                 style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
                             )
                         }
+
                         Spacer(modifier = Modifier.height(Dimensions.paddingSmall))
-                        HorizontalDivider()
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                         Spacer(modifier = Modifier.height(Dimensions.paddingSmall))
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
                                 text = "Total",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
                             )
                             Text(
                                 text = "₦${"%.2f".format(state.total)}",
@@ -159,21 +187,25 @@ fun CartScreen(
                                 color = MaterialTheme.colorScheme.primary,
                             )
                         }
+
                         Spacer(modifier = Modifier.height(Dimensions.paddingMedium))
+
+                        // Place Order button
                         Button(
                             onClick = onCheckout,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(Dimensions.buttonHeight),
-                            shape = RoundedCornerShape(Dimensions.radiusMedium),
+                            shape = RoundedCornerShape(Dimensions.radiusFull),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.primary,
                             ),
                         ) {
                             Text(
-                                text = "Proceed to Checkout",
+                                text = "Place Order",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onPrimary,
                             )
                         }
                     }
@@ -183,19 +215,28 @@ fun CartScreen(
     ) { innerPadding ->
 
         if (state.items.isEmpty()) {
+            // Empty cart state
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
                 contentAlignment = Alignment.Center,
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = "🛒",
+                        style = MaterialTheme.typography.displayLarge,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "Your cart is empty",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground,
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "Browse markets and add products",
                         style = MaterialTheme.typography.bodyMedium,
@@ -205,20 +246,23 @@ fun CartScreen(
             }
         } else {
             LazyColumn(
-                modifier = modifier
+                modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
-                contentPadding = PaddingValues(Dimensions.paddingLarge),
-                verticalArrangement = Arrangement.spacedBy(Dimensions.paddingMedium),
+                contentPadding = PaddingValues(Dimensions.paddingMedium),
+                verticalArrangement = Arrangement.spacedBy(Dimensions.paddingSmall),
             ) {
-
-                // Seller info
+                // Seller name
                 item {
                     Text(
                         text = "From: ${state.sellerName}",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(
+                            horizontal = Dimensions.paddingSmall,
+                            vertical = 4.dp,
+                        ),
                     )
                 }
 
@@ -251,23 +295,25 @@ private fun CartItemCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(Dimensions.radiusMedium),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = Dimensions.cardElevation
-        ),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface,
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = Dimensions.cardElevation,
         ),
     ) {
         Row(
             modifier = Modifier.padding(Dimensions.paddingMedium),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // Product image
             AsyncImage(
                 model = cartItem.product.imageUrl,
                 contentDescription = cartItem.product.name,
                 modifier = Modifier
-                    .size(64.dp)
-                    .clip(RoundedCornerShape(Dimensions.radiusSmall)),
+                    .size(72.dp)
+                    .clip(RoundedCornerShape(Dimensions.radiusSmall))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
                 contentScale = ContentScale.Crop,
             )
 
@@ -280,6 +326,7 @@ private fun CartItemCard(
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                     text = "₦${cartItem.product.price} / ${cartItem.product.unit}",
@@ -295,7 +342,10 @@ private fun CartItemCard(
 
                 Spacer(modifier = Modifier.height(Dimensions.paddingSmall))
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                // Quantity controls
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     IconButton(
                         onClick = onDecrease,
                         modifier = Modifier.size(32.dp),
@@ -304,12 +354,14 @@ private fun CartItemCard(
                             imageVector = Icons.Filled.Remove,
                             contentDescription = "Decrease",
                             tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp),
                         )
                     }
                     Text(
                         text = cartItem.quantity.toString(),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(horizontal = 8.dp),
                     )
                     IconButton(
@@ -320,16 +372,19 @@ private fun CartItemCard(
                             imageVector = Icons.Filled.Add,
                             contentDescription = "Increase",
                             tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp),
                         )
                     }
                 }
             }
 
+            // Delete button
             IconButton(onClick = onRemove) {
                 Icon(
                     imageVector = Icons.Filled.Delete,
                     contentDescription = "Remove",
                     tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(20.dp),
                 )
             }
         }

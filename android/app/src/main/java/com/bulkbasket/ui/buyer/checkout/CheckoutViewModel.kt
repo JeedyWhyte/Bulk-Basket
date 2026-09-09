@@ -23,6 +23,8 @@ data class CheckoutState(
     val error: String? = null,
     val orderPlaced: Boolean = false,
     val orderId: String? = null,
+    val showAddAddressDialog: Boolean = false,
+    val isSavingAddress: Boolean = false,
 )
 
 @HiltViewModel
@@ -65,6 +67,57 @@ class CheckoutViewModel @Inject constructor(
 
     fun selectAddress(id: Int) {
         _state.value = _state.value.copy(selectedAddressId = id)
+    }
+
+    fun showAddAddressDialog() {
+        _state.value = _state.value.copy(showAddAddressDialog = true)
+    }
+
+    fun hideAddAddressDialog() {
+        _state.value = _state.value.copy(showAddAddressDialog = false)
+    }
+
+    fun createAddress(
+        label: String,
+        street: String,
+        city: String,
+        state: String,
+    ) {
+        if (label.isBlank() || street.isBlank() || city.isBlank() || state.isBlank()) {
+            _state.value = _state.value.copy(
+                error = "Please fill in every address field."
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isSavingAddress = true, error = null)
+            val makeDefault = _state.value.addresses.isEmpty()
+            when (val result = authRepository.createAddress(
+                label = label,
+                street = street,
+                city = city,
+                state = state,
+                isDefault = makeDefault,
+            )) {
+                is NetworkResult.Success -> {
+                    val updated = _state.value.addresses + result.data
+                    _state.value = _state.value.copy(
+                        isSavingAddress = false,
+                        showAddAddressDialog = false,
+                        addresses = updated,
+                        selectedAddressId = result.data.id,
+                    )
+                }
+                is NetworkResult.Error -> {
+                    _state.value = _state.value.copy(
+                        isSavingAddress = false,
+                        error = result.message,
+                    )
+                }
+                is NetworkResult.Loading -> {}
+            }
+        }
     }
 
     fun placeOrder(cartViewModel: CartViewModel) {

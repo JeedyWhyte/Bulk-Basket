@@ -14,10 +14,11 @@ class SellerProfileSerializer(serializers.ModelSerializer):
         model = SellerProfile
         fields = [
             'id', 'username', 'email', 'business_name', 'market_name',
-            'description', 'latitude', 'longitude', 'rating', 'is_open', 'opening_time', 'closing_time',
+            'description', 'latitude', 'longitude', 'rating', 'total_ratings',
+            'is_open', 'opening_time', 'closing_time',
             'products', 'created_at',
         ]
-        read_only_fields = ['id', 'rating', 'created_at']
+        read_only_fields = ['id', 'rating', 'total_ratings', 'created_at']
 
 
 class SellerProfileCreateSerializer(serializers.ModelSerializer):

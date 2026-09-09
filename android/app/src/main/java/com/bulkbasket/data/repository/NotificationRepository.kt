@@ -5,6 +5,7 @@ import com.bulkbasket.data.remote.api.NotificationsApi
 import com.bulkbasket.domain.model.Notification
 import com.bulkbasket.domain.repository.INotificationRepository
 import com.bulkbasket.utils.NetworkResult
+import com.bulkbasket.utils.errorMessage
 import javax.inject.Inject
 
 class NotificationRepository @Inject constructor(
@@ -16,10 +17,13 @@ class NotificationRepository @Inject constructor(
             val response = api.getNotifications()
             if (response.isSuccessful) {
                 NetworkResult.Success(
-                    response.body()!!.map { it.toNotification() }
+                    response.body()!!.results.map { it.toNotification() }
                 )
             } else {
-                NetworkResult.Error("Failed to load notifications", response.code())
+                NetworkResult.Error(
+                    response.errorMessage("Failed to load notifications"),
+                    response.code(),
+                )
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")
@@ -30,12 +34,14 @@ class NotificationRepository @Inject constructor(
         return try {
             val response = api.getUnreadCount()
             if (response.isSuccessful) {
-                val count = response.body()
-                    ?.get("data") as? Map<*, *>
-                val unread = (count?.get("unread_count") as? Double)?.toInt() ?: 0
-                NetworkResult.Success(unread)
+                NetworkResult.Success(
+                    response.body()?.data?.unread_count ?: 0
+                )
             } else {
-                NetworkResult.Error("Failed to get unread count", response.code())
+                NetworkResult.Error(
+                    response.errorMessage("Failed to get unread count"),
+                    response.code(),
+                )
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")
@@ -48,7 +54,10 @@ class NotificationRepository @Inject constructor(
             if (response.isSuccessful) {
                 NetworkResult.Success(Unit)
             } else {
-                NetworkResult.Error("Failed to mark as read", response.code())
+                NetworkResult.Error(
+                    response.errorMessage("Failed to mark as read"),
+                    response.code(),
+                )
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")
@@ -61,7 +70,10 @@ class NotificationRepository @Inject constructor(
             if (response.isSuccessful) {
                 NetworkResult.Success(Unit)
             } else {
-                NetworkResult.Error("Failed to mark all as read", response.code())
+                NetworkResult.Error(
+                    response.errorMessage("Failed to mark all as read"),
+                    response.code(),
+                )
             }
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Network error")

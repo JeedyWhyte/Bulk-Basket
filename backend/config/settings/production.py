@@ -3,7 +3,13 @@ from .base import *
 
 DEBUG = False
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
+# Fail fast if the real secret key is missing rather than silently running
+# with the dev fallback from base.py.
+SECRET_KEY = os.environ['SECRET_KEY']
+
+ALLOWED_HOSTS = os.environ.get(
+    'ALLOWED_HOSTS', 'bulkbasket-backend.onrender.com'
+).split(',')
 
 # Database — use Supabase PostgreSQL in production
 DATABASES = {
@@ -34,5 +40,12 @@ SECURE_SSL_REDIRECT = True
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 
-# CORS — allow your Android app
-CORS_ALLOW_ALL_ORIGINS = True
+# CORS — the clients are native mobile apps (no browser origin), so no
+# cross-origin browser access is needed. Add origins explicitly if a web
+# frontend is ever introduced.
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGINS = [
+    origin
+    for origin in os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',')
+    if origin
+]

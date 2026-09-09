@@ -18,6 +18,19 @@ data class LoginResponse(
     val refresh: String,
 )
 
+data class RefreshRequest(
+    val refresh: String,
+)
+
+data class RefreshResponse(
+    val access: String,
+    val refresh: String?,
+)
+
+data class FcmTokenRequest(
+    val fcm_token: String,
+)
+
 data class UserDto(
     val id: Int,
     val username: String,

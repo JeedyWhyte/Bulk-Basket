@@ -11,4 +11,5 @@ urlpatterns = [
     path('token/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
     path('profile/', views.ProfileView.as_view(), name='profile'),
     path('addresses/', views.AddressListCreateView.as_view(), name='addresses'),
+    path('fcm-token/', views.register_fcm_token, name='fcm-token'),
 ]

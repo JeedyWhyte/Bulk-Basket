@@ -33,9 +33,13 @@ class RiderProfileCreateView(generics.CreateAPIView):
             )
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save(user=request.user)
+        profile = serializer.save(user=request.user)
         return Response(
-            {"status": "success", "message": "Rider profile created."},
+            {
+                "status": "success",
+                "message": "Rider profile created.",
+                "data": RiderProfileSerializer(profile).data,
+            },
             status=status.HTTP_201_CREATED,
         )
 

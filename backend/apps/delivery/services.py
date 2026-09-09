@@ -1,5 +1,8 @@
+from django.db import transaction
+from django.db.models import F
 from django.utils import timezone
 from apps.common.exceptions import BusinessLogicError
+from apps.orders.state_machine import transition_order
 from .models import Delivery, RiderProfile
 
 
@@ -44,17 +47,40 @@ def transition_delivery(delivery, new_status, rider):
             f"Allowed: {allowed}"
         )
 
-    delivery.status = new_status
+    # Delivery.order is one-to-one, so leaving a delivery 'failed' before
+    # pickup would permanently strand its order (no replacement Delivery
+    # could ever be created). Reset it to 'pending' instead, so another
+    # rider can claim it.
+    failed_before_pickup = new_status == 'failed' and delivery.status == 'assigned'
 
-    if new_status == 'picked_up':
-        delivery.picked_up_at = timezone.now()
-    elif new_status == 'delivered':
-        delivery.delivered_at = timezone.now()
-        RiderProfile.objects.filter(user=rider).update(
-            total_deliveries=delivery.rider.rider_profile.total_deliveries + 1
-        )
+    with transaction.atomic():
+        if failed_before_pickup:
+            delivery.status = 'pending'
+            delivery.rider = None
+            delivery.assigned_at = None
+        else:
+            delivery.status = new_status
 
-    delivery.save()
+            if new_status == 'picked_up':
+                delivery.picked_up_at = timezone.now()
+            elif new_status == 'delivered':
+                delivery.delivered_at = timezone.now()
+                # F() expression so concurrent completions don't lose increments.
+                RiderProfile.objects.filter(user=rider).update(
+                    total_deliveries=F('total_deliveries') + 1
+                )
+
+        delivery.save()
+
+        # Keep the buyer-facing order status in sync with the delivery.
+        # A failed delivery leaves the order 'in_transit' (or 'ready') so the
+        # seller can arrange a new attempt manually.
+        order = delivery.order
+        if new_status == 'picked_up' and order.status == 'ready':
+            transition_order(order, 'in_transit')
+        elif new_status == 'delivered' and order.status == 'in_transit':
+            transition_order(order, 'delivered')
+
     return delivery
 
 

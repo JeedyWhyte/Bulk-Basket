@@ -1,6 +1,6 @@
 package com.bulkbasket.ui.seller.common
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -39,7 +39,11 @@ fun OrderCard(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(Dimensions.radiusMedium),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = Dimensions.cardElevation
+            defaultElevation = Dimensions.cardElevation,
+        ),
+        border = BorderStroke(
+            width = Dimensions.cardBorderWidth,
+            color = MaterialTheme.colorScheme.outline,
         ),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface,

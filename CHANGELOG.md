@@ -30,21 +30,34 @@ For academic milestones, we use suffixes:
 - 5-person team structure with role assignments
 - Three UI design directions (Sleek, Bold, Dashboard)
 - Architecture diagrams and database schema design
+- Seller-side navigation shell and bottom navigation (`SellerShellScreen`, `SellerBottomNav`), mirroring the buyer experience
+- Buyer category browsing (`Category` domain model, `CategoryMapper`, dedicated category screen)
+- Centralized token-refresh handling for the Android app (`TokenAuthenticator`)
+- `orders.0002_orderitem_product_protect` migration — deleting a product referenced by past orders is now rejected instead of cascading
+- A global DRF exception handler that turns a blocked deletion (`ProtectedError`) into a clean 400 response
+- Backend test coverage for order creation, delivery status transitions, product visibility, and the new exception handler
 
 ### Changed
-- N/A
+- `create_order()` now locks all line-item products in a single query instead of one per item
+- Android login no longer waits on FCM token registration before completing
 
 ### Deprecated
 - N/A
 
 ### Removed
-- N/A
+- Unused Celery task for order-status notifications, superseded by the synchronous notification call already used in `orders/views.py`
+- Empty Django test stub files (`orders/tests.py`, `products/tests.py`, `users/tests.py`) that the test runner never collected, replaced by real `tests/` packages with actual coverage
 
 ### Fixed
-- N/A
+- Android `BASE_URL` no longer points at a developer's local network address
+- The buyer's Cart screen no longer renders blank when reached via "View Cart" from a seller or product detail page
+- The category list no longer fails to load due to a pagination mismatch with the backend
+- A delivery that fails before pickup no longer permanently strands its order — it's now reclaimable by another rider
+- Delivery and order status updates are now applied atomically
+- A seller can now open their own soft-deleted product for editing instead of getting a 404
 
 ### Security
-- N/A
+- Deleting a product still referenced by past orders is now rejected at the application level (`PROTECT` + a custom exception handler) instead of cascading or raising an unhandled 500
 
 ---
 

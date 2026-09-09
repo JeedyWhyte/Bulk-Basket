@@ -1,6 +1,8 @@
 package com.bulkbasket.di
 
+import com.bulkbasket.BuildConfig
 import com.bulkbasket.data.remote.interceptors.AuthInterceptor
+import com.bulkbasket.data.remote.interceptors.TokenAuthenticator
 import com.bulkbasket.utils.Constants
 import com.bulkbasket.data.remote.api.AuthApi
 import com.bulkbasket.data.remote.api.DeliveryApi
@@ -26,7 +28,13 @@ object NetworkModule {
     @Singleton
     fun provideLoggingInterceptor(): HttpLoggingInterceptor {
         return HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            // BODY logs the Authorization header and full payloads (PII);
+            // never enable it in release builds.
+            level = if (BuildConfig.DEBUG) {
+                HttpLoggingInterceptor.Level.BODY
+            } else {
+                HttpLoggingInterceptor.Level.NONE
+            }
         }
     }
 
@@ -34,10 +42,12 @@ object NetworkModule {
     @Singleton
     fun provideOkHttpClient(
         authInterceptor: AuthInterceptor,
+        tokenAuthenticator: TokenAuthenticator,
         loggingInterceptor: HttpLoggingInterceptor,
     ): OkHttpClient {
         return OkHttpClient.Builder()
             .addInterceptor(authInterceptor)
+            .authenticator(tokenAuthenticator)
             .addInterceptor(loggingInterceptor)
             .build()
     }
